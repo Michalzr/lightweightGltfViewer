@@ -1,0 +1,1 @@
+{"version":3,"file":"quaternion.js","sourceRoot":"","sources":["../../../utils/mathUtils/quaternion.ts"],"names":[],"mappings":"AAEA,MAAM,UAAU,MAAM;IAClB,OAAO,CAAC,CAAC,EAAE,CAAC,EAAE,CAAC,EAAE,CAAC,CAAC,CAAC;AACxB,CAAC;AAED,MAAM,UAAU,KAAK,CAAC,CAAa;IAC/B,OAAO,CAAC,CAAC,KAAK,EAAgB,CAAC;AACnC,CAAC"}
