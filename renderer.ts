@@ -46,6 +46,9 @@ export class Renderer {
             alert("Unable to initialize WebGL. Your browser or machine may not support it.");
             return;
         }
+
+        // Allow UNSIGNED_INT extension
+        this.gl.getExtension("OES_element_index_uint");
     }
 
     setGltf(loadedGltf: LoadedGltf): void {
