@@ -35,7 +35,7 @@ export class Renderer {
     private glShaders = new Map<string, ShaderInfo>();
 
     private gltf: LoadedGltf;
-    private dataViewToWebGLBuffer = new Map<number, WebGLBuffer>();
+    private accessorToWebGLBuffer = new Map<number, WebGLBuffer>();
 
     constructor(canvas: HTMLCanvasElement) {
         // Initialize the GL context
@@ -136,13 +136,14 @@ export class Renderer {
                     continue;
                 }
                 
-                const accessor = this.gltf.accessors[meshPrimitive.attributes[attribute]];
-                let buffer = this.dataViewToWebGLBuffer.get(accessor.bufferView);
+                const accessorIdx = meshPrimitive.attributes[attribute];
+                const accessor = this.gltf.accessors[accessorIdx];
+                let buffer = this.accessorToWebGLBuffer.get(accessorIdx);
 
                 if (!buffer) {
                     // buffer is being used for the first time, initialize
                     buffer = this.gl.createBuffer();
-                    this.dataViewToWebGLBuffer.set(accessor.bufferView, buffer);
+                    this.accessorToWebGLBuffer.set(accessorIdx, buffer);
 
                     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
                     this.gl.bufferData(this.gl.ARRAY_BUFFER, this.gltf.dataViews[accessor.bufferView], this.gl.STATIC_DRAW);
@@ -161,23 +162,23 @@ export class Renderer {
                     accessor.byteOffset
                 );
                 this.gl.enableVertexAttribArray(attribLocation);
-                
-                this.gl.useProgram(shaderInfo.program);
-
-                
-                const modelMatrix = node.matrix as Mat4Math.Mat4; // TODO: parent matrices
-
-                const inverseModelMatrix = Mat4Math.invert(modelMatrix);
-                const transposedInversedModeMatrix = Mat4Math.transpose(inverseModelMatrix);
-                const modelMatrixForNormal = Mat4Math.getSubMatrix3(transposedInversedModeMatrix);
-
-                this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.viewMatrix, false, viewMatrix);
-                this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
-                this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.modelMatrix, false, modelMatrix);
-                this.gl.uniformMatrix3fv(shaderInfo.uniformLocations.modelMatrixForNormal, false, modelMatrixForNormal);
-
-                this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
             }
+
+            this.gl.useProgram(shaderInfo.program);
+
+            
+            const modelMatrix = node.matrix as Mat4Math.Mat4; // TODO: parent matrices
+
+            const inverseModelMatrix = Mat4Math.invert(modelMatrix);
+            const transposedInversedModeMatrix = Mat4Math.transpose(inverseModelMatrix);
+            const modelMatrixForNormal = Mat4Math.getSubMatrix3(transposedInversedModeMatrix);
+
+            this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.viewMatrix, false, viewMatrix);
+            this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
+            this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.modelMatrix, false, modelMatrix);
+            this.gl.uniformMatrix3fv(shaderInfo.uniformLocations.modelMatrixForNormal, false, modelMatrixForNormal);
+
+            this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
         });
     }
 
