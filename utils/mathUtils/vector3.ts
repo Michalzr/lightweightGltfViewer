@@ -20,6 +20,13 @@ export function sub(a: Vec3, b: Vec3): Vec3 {
     return a;
 }
 
+export function multiply(a: Vec3, b: Vec3): Vec3 {
+    a[0] *= b[0];
+    a[1] *= b[1];
+    a[2] *= b[2];
+    return a;
+}
+
 export function multiplyScalar(a: Vec3, scalar: number): Vec3 {
     a[0] *= scalar;
     a[1] *= scalar;

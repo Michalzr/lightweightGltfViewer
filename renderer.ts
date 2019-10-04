@@ -93,7 +93,7 @@ export class Renderer {
         const fieldOfView = 45 * Math.PI / 180;   // in radians
         const aspect = this.gl.canvas.clientWidth / this.gl.canvas.clientHeight;
         const zNear = 0.1;
-        const zFar = 1000.0;
+        const zFar = 100.0;
         const projectionMatrix = Mat4Math.perspective(fieldOfView, aspect, zNear, zFar);
 
 
@@ -109,15 +109,17 @@ export class Renderer {
             return;
         }
 
-        this.gltf.nodes.forEach(node => {
-            this.renderNode(node, viewMatrix, projectionMatrix);
+        this.gltf.rootNodeIds.forEach(nodeId => {
+            this.renderNode(this.gltf.nodes[nodeId], Mat4Math.create(), viewMatrix, projectionMatrix);
         });
     }
 
-    renderNode(node: GlTf.Node, viewMatrix: Mat4Math.Mat4, projectionMatrix: Mat4Math.Mat4): void {
+    renderNode(node: GlTf.Node, parentModelMatrix: Mat4Math.Mat4, viewMatrix: Mat4Math.Mat4, projectionMatrix: Mat4Math.Mat4): void {
+        const modelMatrix = Mat4Math.multiply(parentModelMatrix, node.matrix as Mat4Math.Mat4);
+
         if (node.hasOwnProperty("children")) {
             node.children.forEach(chIdx => {
-                this.renderNode(this.gltf.nodes[chIdx], viewMatrix, projectionMatrix);
+                this.renderNode(this.gltf.nodes[chIdx], modelMatrix, viewMatrix, projectionMatrix);
             });
         }
 
@@ -188,8 +190,6 @@ export class Renderer {
             }
 
             this.gl.useProgram(shaderInfo.program);
-            
-            const modelMatrix = node.matrix as Mat4Math.Mat4; // TODO: parent matrices
 
             const inverseModelMatrix = Mat4Math.invert(modelMatrix);
             const transposedInversedModeMatrix = Mat4Math.transpose(inverseModelMatrix);
@@ -200,10 +200,12 @@ export class Renderer {
             this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.modelMatrix, false, modelMatrix);
             this.gl.uniformMatrix3fv(shaderInfo.uniformLocations.modelMatrixForNormal, false, modelMatrixForNormal);
 
+            const renderMode = meshPrimitive.mode === undefined ? this.gl.TRIANGLES : meshPrimitive.mode;
+
             if (indexAccessor) {
-                this.gl.drawElements(meshPrimitive.mode, indexAccessor.count, indexAccessor.componentType, indexAccessor.byteOffset);
+                this.gl.drawElements(renderMode, indexAccessor.count, indexAccessor.componentType, indexAccessor.byteOffset);
             } else {
-                this.gl.drawArrays(meshPrimitive.mode, 0, vertexCount);
+                this.gl.drawArrays(renderMode, 0, vertexCount);
             }
         });
     }

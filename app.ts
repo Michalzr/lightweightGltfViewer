@@ -3,10 +3,8 @@ import { OrbitControls } from "./orbitControls.js"
 import { bindDragAndDrop } from "./dragAndDrop.js"
 import { LoadedGltf, GltfLoader } from "./gltfLoader.js"
 
-// Skoncil si ze si dokoncil rendrovanie gltf suborov
 // TODO:
-// - "fit to view" nech je model vzdy v strede a spravnej velkosti
-// - skontroluj ci nemas memory leaky (aj na grafike)
+// - "Drag&Drop" vycisti sucasnu scenu a nahradi ju novou (daj si pozor na uvolnenie vsetkej pamate!)
 
 const vertexShaderSource = `
 attribute vec3 position;
@@ -20,7 +18,7 @@ uniform mat4 projectionMatrix;
 varying vec3 vNormal;
 
 void main() {
-  vNormal = mat3(viewMatrix) * modelMatrixForNormal * normal;
+  vNormal = normalize(mat3(viewMatrix) * modelMatrixForNormal * normal);
   gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position.xyz, 1);
 }
 `;

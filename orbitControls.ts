@@ -24,7 +24,7 @@ export class OrbitControls {
     private thetaStart: number = 0;
 
     private target: Vec3Math.Vec3 = [0, 0, 0];
-    private radius: number = 6;
+    private radius: number = 2;
     private phi: number = Math.PI / 4;
     private theta: number = Math.PI / 4;
 

@@ -93,7 +93,7 @@ export function setTranslation(out: Mat4, v: Vec3Math.Vec3): Mat4 {
 }
 
 // Creates a matrix from a vector translation, quaternion rotation and vector scale
-export function fromRotationTranslationScale(v: Vec3Math.Vec3, q: QuaternionMath.Quaternion, s: Vec3Math.Vec3, out: Mat4 = create()) {
+export function fromTranslationRotationScale(v: Vec3Math.Vec3, q: QuaternionMath.Quaternion, s: Vec3Math.Vec3, out: Mat4 = create()) {
     // Quaternion math
     const x = q[0],
         y = q[1],
