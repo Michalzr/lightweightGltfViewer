@@ -35,7 +35,7 @@ export class Renderer {
     private glShaders = new Map<string, ShaderInfo>();
 
     private gltf: LoadedGltf;
-    private accessorToWebGLBuffer = new Map<number, WebGLBuffer>();
+    private dataViewToWebGLBuffer = new Map<number, WebGLBuffer>();
 
     constructor(canvas: HTMLCanvasElement) {
         // Initialize the GL context
@@ -90,7 +90,7 @@ export class Renderer {
         const fieldOfView = 45 * Math.PI / 180;   // in radians
         const aspect = this.gl.canvas.clientWidth / this.gl.canvas.clientHeight;
         const zNear = 0.1;
-        const zFar = 100.0;
+        const zFar = 1000.0;
         const projectionMatrix = Mat4Math.perspective(fieldOfView, aspect, zNear, zFar);
 
 
@@ -131,19 +131,39 @@ export class Renderer {
 
 
         meshPrimitives.forEach(meshPrimitive => {
+            // resolve indices
+            const indexAccessor = this.gltf.accessors[meshPrimitive.indices];
+            if (indexAccessor) {
+                let buffer = this.dataViewToWebGLBuffer.get(indexAccessor.bufferView);
+
+                if (!buffer) {
+                    buffer = this.gl.createBuffer();
+                    this.dataViewToWebGLBuffer.set(indexAccessor.bufferView, buffer);
+
+                    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, buffer);
+                    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, this.gltf.dataViews[indexAccessor.bufferView], this.gl.STATIC_DRAW);
+                
+                } else {
+                    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, buffer);
+                }
+            }
+
+            // resolve attributes
+            let vertexCount = 0;
             for (let attribute in meshPrimitive.attributes) {
                 if (!shaderInfo.attribLocations.hasOwnProperty(attribute)) {
                     continue;
                 }
                 
-                const accessorIdx = meshPrimitive.attributes[attribute];
-                const accessor = this.gltf.accessors[accessorIdx];
-                let buffer = this.accessorToWebGLBuffer.get(accessorIdx);
+                const accessor = this.gltf.accessors[meshPrimitive.attributes[attribute]];
+                let buffer = this.dataViewToWebGLBuffer.get(accessor.bufferView);
+
+                vertexCount = accessor.count;
 
                 if (!buffer) {
                     // buffer is being used for the first time, initialize
                     buffer = this.gl.createBuffer();
-                    this.accessorToWebGLBuffer.set(accessorIdx, buffer);
+                    this.dataViewToWebGLBuffer.set(accessor.bufferView, buffer);
 
                     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
                     this.gl.bufferData(this.gl.ARRAY_BUFFER, this.gltf.dataViews[accessor.bufferView], this.gl.STATIC_DRAW);
@@ -165,7 +185,6 @@ export class Renderer {
             }
 
             this.gl.useProgram(shaderInfo.program);
-
             
             const modelMatrix = node.matrix as Mat4Math.Mat4; // TODO: parent matrices
 
@@ -178,7 +197,11 @@ export class Renderer {
             this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.modelMatrix, false, modelMatrix);
             this.gl.uniformMatrix3fv(shaderInfo.uniformLocations.modelMatrixForNormal, false, modelMatrixForNormal);
 
-            this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
+            if (indexAccessor) {
+                this.gl.drawElements(meshPrimitive.mode, indexAccessor.count, indexAccessor.componentType, indexAccessor.byteOffset);
+            } else {
+                this.gl.drawArrays(meshPrimitive.mode, 0, vertexCount);
+            }
         });
     }
 

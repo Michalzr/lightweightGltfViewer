@@ -3,10 +3,10 @@ import { OrbitControls } from "./orbitControls.js"
 import { bindDragAndDrop } from "./dragAndDrop.js"
 import { LoadedGltf, GltfLoader } from "./gltfLoader.js"
 
-// Skoncil si ze si dokoncil rendrovanie gltf suborov, ale nestihol si otestovat + ta caka daky cleanup
-// Takze hned prvy test ukazal ze si dement:
-// - nemozem narobit DataView z BufferView, lebo accessor ma dalsi byteOffset ktory nemam ako pouzit... 
-//   cize dataViewToWebGLBuffer v rendereri je blbost..
+// Skoncil si ze si dokoncil rendrovanie gltf suborov
+// TODO:
+// - "fit to view" nech je model vzdy v strede a spravnej velkosti
+// - skontroluj ci nemas memory leaky (aj na grafike)
 
 const vertexShaderSource = `
 attribute vec3 position;
