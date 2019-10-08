@@ -51,7 +51,15 @@ export class Renderer {
         this.gl.getExtension("OES_element_index_uint");
     }
 
+    deleteBuffers(): void {
+        this.dataViewToWebGLBuffer.forEach((webGLBuffer, dataViewIdx) => {
+            this.gl.deleteBuffer(webGLBuffer);
+        });
+        this.dataViewToWebGLBuffer.clear();
+    }
+
     setGltf(loadedGltf: LoadedGltf): void {
+        this.deleteBuffers();
         this.gltf = loadedGltf;
     }
 
@@ -147,7 +155,7 @@ export class Renderer {
 
                     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, buffer);
                     this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, this.gltf.dataViews[indexAccessor.bufferView], this.gl.STATIC_DRAW);
-                
+
                 } else {
                     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, buffer);
                 }
@@ -159,7 +167,7 @@ export class Renderer {
                 if (!shaderInfo.attribLocations.hasOwnProperty(attribute)) {
                     continue;
                 }
-                
+
                 const accessor = this.gltf.accessors[meshPrimitive.attributes[attribute]];
                 let buffer = this.dataViewToWebGLBuffer.get(accessor.bufferView);
 
