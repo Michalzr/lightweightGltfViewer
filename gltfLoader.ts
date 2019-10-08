@@ -7,12 +7,17 @@ import * as QuaternionMath from "./utils/mathUtils/quaternion.js";
 // the idea is to use the same structure as gltf, except:
 // - bufferViews are DataView objects
 // - accessors contain extra property "byteStride" (taken from the bufferView)
+// - images are HTMLImageElements
 export interface LoadedGltf {
     rootNodeIds: number[];
     nodes?: GlTf.Node[];
     meshes?: GlTf.Mesh[];
+    materials?: GlTf.Material[];
+    textures?: GlTf.Texture[];
+    samplers?: GlTf.Sampler[];
     accessors?: Accessor[];
     dataViews?: DataView[];
+    images?: HTMLImageElement[];
 }
 
 export interface Accessor extends GlTf.Accessor {
@@ -31,13 +36,10 @@ export interface Accessor extends GlTf.Accessor {
 // ]);
 
 export class GltfLoader {
-    private static readonly textureName = "Gltf Import";
     private static readonly gltfExtension = ".gltf";
     private static readonly glbExtension = ".glb";
 
     textureSourceIdxToId: Map<number, string> = new Map();
-
-    missingImagesURIs: string[] = [];
 
     async load(files: NamedBlob[]): Promise<LoadedGltf>  {
         const gltfFile = files.find(f => f.name.endsWith(GltfLoader.gltfExtension) || f.name.endsWith(GltfLoader.glbExtension));
@@ -118,7 +120,7 @@ export class GltfLoader {
 
         const data = await this.loadImagesAndBuffers(gltfJson, files, binaryBuffer);
 
-        return this.createImportData(gltfJson, data.buffers, data.imageFiles);
+        return this.createImportData(gltfJson, data.buffers, data.images);
     }
 
     private async parseNonBinary(gltf: NamedBlob, files: NamedBlob[]): Promise<LoadedGltf> {
@@ -133,11 +135,11 @@ export class GltfLoader {
 
         const data = await this.loadImagesAndBuffers(gltfJson, files);
 
-        return this.createImportData(gltfJson, data.buffers, data.imageFiles);
+        return this.createImportData(gltfJson, data.buffers, data.images);
     }
 
-    private async loadImagesAndBuffers(gltfJson: GlTf.GlTf, files: NamedBlob[], glbBuffer?: ArrayBuffer): Promise<{ imageFiles: NamedBlob[], buffers: ArrayBuffer[] }> {
-        let imageFiles: NamedBlob[];
+    private async loadImagesAndBuffers(gltfJson: GlTf.GlTf, files: NamedBlob[], glbBuffer?: ArrayBuffer): Promise<{ images: HTMLImageElement[], buffers: ArrayBuffer[] }> {
+        let images: HTMLImageElement[];
         let buffers: ArrayBuffer[];
 
         const bufferFilesPromises = gltfJson.buffers.map(async (b, i) => {
@@ -171,31 +173,22 @@ export class GltfLoader {
         buffers = await Promise.all(bufferFilesPromises);
 
         if (gltfJson.images) {
-            const imageFilesPromises = gltfJson.images.map(async (i, idx) => {
+            const imageFilesPromises: Promise<HTMLImageElement>[] = gltfJson.images.map(async (i, idx) => {
+                let url = "";
+
                 if (i.uri) {
                     // load image using uri
                     if (/^data:.*,.*$/i.test(i.uri) || /^(https?:)?\/\//i.test(i.uri)) {
-                        // data uri, or http uri
-                        const response = await fetch(i.uri);
-                        if (!response.ok) {
-                            this.missingImagesURIs.push(i.uri);
-                            return null;
-                        }
-                        const imageBlob = await response.blob();
-                        return new NamedBlob(imageBlob, GltfLoader.textureName);
+                        url = i.uri;
 
                     } else {
                         // relative path
                         const processedFileUri = preprocessUri(i.uri);
                         const imageFile = files.find(file => file.name === processedFileUri);
 
-                        if (!imageFile) {
-                            this.missingImagesURIs.push(i.uri);
-                            return null;
-                        }
+                        if (!imageFile) { return Promise.reject("Image file " + i.uri + " not found.");}
 
-                        const imageName = imageFile.name.split("/").pop();
-                        return new NamedBlob(imageFile.blob, imageName);
+                        url = URL.createObjectURL(imageFile.blob);
                     }
 
                 } else {
@@ -204,21 +197,29 @@ export class GltfLoader {
                     const binaryBuffer = buffers[imageBufferView.buffer];
                     const imageDataView = new DataView(binaryBuffer, imageBufferView.byteOffset, imageBufferView.byteLength);
 
-                    const imageBlob = new Blob([imageDataView], { type: i.mimeType });
-                    return new NamedBlob(imageBlob, GltfLoader.textureName);
+                    url = URL.createObjectURL(new Blob([imageDataView], { type: i.mimeType }));
                 }
+
+                const image = new Image();
+                
+                return new Promise<HTMLImageElement>((resolve, reject) => {
+                    image.addEventListener('load', () => {
+                        resolve(image);
+                    });
+                    image.src = url;
+                });
             });
 
-            imageFiles = await Promise.all(imageFilesPromises);
+            images = await Promise.all(imageFilesPromises);
         }
 
         return {
-            imageFiles,
+            images,
             buffers
         };
     }
 
-    private createImportData(gltfJson: GlTf.GlTf, buffers: ArrayBuffer[], imageFiles: NamedBlob[]): LoadedGltf {
+    private createImportData(gltfJson: GlTf.GlTf, buffers: ArrayBuffer[], images: HTMLImageElement[]): LoadedGltf {
         // make sure every node has matrix
         gltfJson.nodes.forEach(gltfNode => {
             gltfNode.matrix = this.getMatrixForNode(gltfNode);
@@ -233,6 +234,10 @@ export class GltfLoader {
             rootNodeIds: gltfJson.scenes[gltfJson.scene].nodes,
             nodes: gltfJson.nodes,
             meshes: gltfJson.meshes,
+            materials: gltfJson.materials,
+            textures: gltfJson.textures,
+            samplers: gltfJson.samplers,
+            images: images,
             accessors: gltfJson.accessors as Accessor[],
             dataViews: this.createDataViews(gltfJson, buffers)
         }

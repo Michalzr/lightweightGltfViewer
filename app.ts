@@ -3,33 +3,15 @@ import { OrbitControls } from "./orbitControls.js"
 import { bindDragAndDrop } from "./dragAndDrop.js"
 import { GltfLoader } from "./gltfLoader.js"
 
-const vertexShaderSource = `
-attribute vec3 position;
-attribute vec3 normal;
-
-uniform mat4 modelMatrix;
-uniform mat3 modelMatrixForNormal;
-uniform mat4 viewMatrix;
-uniform mat4 projectionMatrix;
-
-varying vec3 vNormal;
-
-void main() {
-  vNormal = normalize(mat3(viewMatrix) * modelMatrixForNormal * normal);
-  gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position.xyz, 1);
-}
-`;
-
-const fragmentShaderSource = `
-precision mediump float;
-
-varying vec3 vNormal;
-
-void main() {
-  float intensity = max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0)));
-  gl_FragColor = vec4(intensity, intensity, intensity, 1.0);
-}
-`;
+// TODO:
+// - Color texture
+//       - find out why opacity doesn't work
+//       - use sampler values
+//       - implement fallback for when texture size is not power of two (only under some sampler conditions..)
+// - Implement environment light
+// - Implement other textures
+// - If there aren't normals in a primitive, compute them
+// - If there aren't tangents in a primitive, compute them
 
 function run() {
     const canvas = document.querySelector("#glCanvas") as HTMLCanvasElement;
@@ -42,8 +24,6 @@ function run() {
         renderer.setGltf(loadedGltf);
         renderer.render(orbitControls.getViewMatrix());
     });
-
-    renderer.initShader("shaderIndex", vertexShaderSource, fragmentShaderSource);
 
     orbitControls.sigChange.connect(() => {
         // instead of having render loop, we only render when moving camera
