@@ -33,7 +33,7 @@ varying vec2 vTextureCoord;
 
 void main() {
     vec4 texColor = texture2D(colorSampler, vTextureCoord);
-    float intensity = max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0)));
+    float intensity = max(0.0, abs(dot(vNormal, vec3(0.0, 0.0, 1.0))));
     gl_FragColor = vec4(texColor.xyz * intensity, texColor.w);
 }
 `;
@@ -232,6 +232,24 @@ export class Renderer {
     }
 
     private setMaterialUniforms(material: GlTf.Material): void {
+        // set culling based on "doubleSided" property
+        if (material.doubleSided) {
+            this.gl.disable(this.gl.CULL_FACE);
+        } else {
+            this.gl.enable(this.gl.CULL_FACE);
+            this.gl.cullFace(this.gl.BACK);
+        }
+
+        // set blending based on alpha mode
+        // TODO: imeplement "MASK" with alpha cutoff
+        // TODO: also implement ordering opaque objects based on distance from camera
+        if (material.alphaMode === "BLEND") {
+            this.gl.enable(this.gl.BLEND);
+            this.gl.blendFuncSeparate(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA, this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA);
+        } else {
+            this.gl.disable(this.gl.BLEND);
+        }
+
         if (material.pbrMetallicRoughness) {
             if (material.pbrMetallicRoughness.hasOwnProperty("baseColorTexture")) {
                 const textureIdx = material.pbrMetallicRoughness.baseColorTexture.index;

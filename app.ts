@@ -4,8 +4,9 @@ import { bindDragAndDrop } from "./dragAndDrop.js"
 import { GltfLoader } from "./gltfLoader.js"
 
 // TODO:
+// - Currently objects without texture don'w work well..
+//   I think this is time to study a bit about "DEFINES" in shader
 // - Color texture
-//       - find out why opacity doesn't work
 //       - use sampler values
 //       - implement fallback for when texture size is not power of two (only under some sampler conditions..)
 // - Implement environment light
