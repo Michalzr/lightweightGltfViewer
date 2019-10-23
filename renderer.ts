@@ -1,58 +1,8 @@
 import * as Mat4Math from "./utils/mathUtils/martix4.js";
 import { LoadedGltf } from "./gltfLoader.js"
 import * as GlTf from "./gltfInterface.js";
+import { ShaderCache, ShaderInfo } from "./shaderCache.js"
 
-
-const vertexShaderSource = `
-attribute vec3 position;
-attribute vec3 normal;
-attribute vec2 texcoord0;
-
-uniform mat4 modelMatrix;
-uniform mat3 modelMatrixForNormal;
-uniform mat4 viewMatrix;
-uniform mat4 projectionMatrix;
-
-varying vec3 vNormal;
-varying vec2 vTextureCoord;
-
-void main() {
-    vNormal = normalize(mat3(viewMatrix) * modelMatrixForNormal * normal);
-    vTextureCoord = texcoord0;
-    gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position.xyz, 1);
-}
-`;
-
-const fragmentShaderSource = `
-precision mediump float;
-
-uniform sampler2D colorSampler;
-
-varying vec3 vNormal;
-varying vec2 vTextureCoord;
-
-void main() {
-    vec4 texColor = texture2D(colorSampler, vTextureCoord);
-    float intensity = max(0.0, abs(dot(vNormal, vec3(0.0, 0.0, 1.0))));
-    gl_FragColor = vec4(texColor.xyz * intensity, texColor.w);
-}
-`;
-
-interface ShaderInfo {
-    program: WebGLProgram,
-    attribLocations: {
-        POSITION: GLint,
-        NORMAL: GLint,
-        TEXCOORD_0: GLint
-    },
-    uniformLocations: {
-        colorSampler: WebGLUniformLocation,
-        viewMatrix: WebGLUniformLocation,
-        projectionMatrix: WebGLUniformLocation,
-        modelMatrix: WebGLUniformLocation,
-        modelMatrixForNormal: WebGLUniformLocation,
-    },
-}
 
 export class Renderer {
     private static readonly NUMBER_OF_COMPONENTS: Map<string, number> = new Map([
@@ -66,7 +16,7 @@ export class Renderer {
     ]);
 
     private gl: WebGLRenderingContext;
-    private pbrShaderInfo: ShaderInfo;
+    private shaderCache: ShaderCache;
 
     private gltf: LoadedGltf;
     private dataViewToWebGLBuffer = new Map<number, WebGLBuffer>();
@@ -86,7 +36,7 @@ export class Renderer {
         this.gl.getExtension("OES_element_index_uint");
 
         // init shader
-        this.pbrShaderInfo = this.initShader(vertexShaderSource, fragmentShaderSource);
+        this.shaderCache = new ShaderCache(this.gl);
     }
 
     deleteBuffersAndTextures(): void {
@@ -152,6 +102,25 @@ export class Renderer {
     }
 
     private renderMeshPrimitive(meshPrimitive: GlTf.MeshPrimitive, modelMatrix: Mat4Math.Mat4, viewMatrix: Mat4Math.Mat4, projectionMatrix: Mat4Math.Mat4): void {
+
+        if (!meshPrimitive.hasOwnProperty("material")) {
+            return;
+        }
+
+        const shaderInfo = this.getShaderInfo(this.gltf.materials[meshPrimitive.material], meshPrimitive);
+
+        this.gl.useProgram(shaderInfo.program); // if we really keep using only one shader, we can move this to initShader
+
+        const inverseModelMatrix = Mat4Math.invert(modelMatrix);
+        const transposedInversedModeMatrix = Mat4Math.transpose(inverseModelMatrix);
+        const modelMatrixForNormal = Mat4Math.getSubMatrix3(transposedInversedModeMatrix);
+
+        this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.viewMatrix, false, viewMatrix);
+        this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
+        this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.modelMatrix, false, modelMatrix);
+        this.gl.uniformMatrix3fv(shaderInfo.uniformLocations.modelMatrixForNormal, false, modelMatrixForNormal);
+
+
         // resolve indices
         const indexAccessor = this.gltf.accessors[meshPrimitive.indices];
         if (indexAccessor) {
@@ -172,7 +141,7 @@ export class Renderer {
         // resolve attributes
         let vertexCount = 0;
         for (let attribute in meshPrimitive.attributes) {
-            if (!this.pbrShaderInfo.attribLocations.hasOwnProperty(attribute)) {
+            if (!shaderInfo.attribLocations.hasOwnProperty(attribute)) {
                 continue;
             }
 
@@ -193,7 +162,7 @@ export class Renderer {
                 this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer)
             }
 
-            const attribLocation = (this.pbrShaderInfo.attribLocations as any)[attribute]; // TODO: fix typing
+            const attribLocation = (shaderInfo.attribLocations as any)[attribute]; // TODO: fix typing
             this.gl.vertexAttribPointer(
                 attribLocation,
                 Renderer.NUMBER_OF_COMPONENTS.get(accessor.type),
@@ -206,23 +175,7 @@ export class Renderer {
         }
 
         if (vertexCount > 0) {
-            this.gl.useProgram(this.pbrShaderInfo.program); // if we really keep using only one shader, we can move this to initShader
-
-            const inverseModelMatrix = Mat4Math.invert(modelMatrix);
-            const transposedInversedModeMatrix = Mat4Math.transpose(inverseModelMatrix);
-            const modelMatrixForNormal = Mat4Math.getSubMatrix3(transposedInversedModeMatrix);
-
-            this.gl.uniformMatrix4fv(this.pbrShaderInfo.uniformLocations.viewMatrix, false, viewMatrix);
-            this.gl.uniformMatrix4fv(this.pbrShaderInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
-            this.gl.uniformMatrix4fv(this.pbrShaderInfo.uniformLocations.modelMatrix, false, modelMatrix);
-            this.gl.uniformMatrix3fv(this.pbrShaderInfo.uniformLocations.modelMatrixForNormal, false, modelMatrixForNormal);
-
             const renderMode = meshPrimitive.mode === undefined ? this.gl.TRIANGLES : meshPrimitive.mode;
-
-            if (meshPrimitive.hasOwnProperty("material")) {
-                this.setMaterialUniforms(this.gltf.materials[meshPrimitive.material]);
-            }
-
             if (indexAccessor) {
                 this.gl.drawElements(renderMode, indexAccessor.count, indexAccessor.componentType, indexAccessor.byteOffset);
             } else {
@@ -231,7 +184,8 @@ export class Renderer {
         }
     }
 
-    private setMaterialUniforms(material: GlTf.Material): void {
+    // TODO: nicer handling of "defines"
+    private getShaderInfo(material: GlTf.Material, meshPrimitive: GlTf.MeshPrimitive): ShaderInfo {
         // set culling based on "doubleSided" property
         if (material.doubleSided) {
             this.gl.disable(this.gl.CULL_FACE);
@@ -241,7 +195,7 @@ export class Renderer {
         }
 
         // set blending based on alpha mode
-        // TODO: imeplement "MASK" with alpha cutoff
+        // TODO: imeplement "MASK" with alpha cutoff. You'll have to do it manually in a shader
         // TODO: also implement ordering opaque objects based on distance from camera
         if (material.alphaMode === "BLEND") {
             this.gl.enable(this.gl.BLEND);
@@ -250,6 +204,23 @@ export class Renderer {
             this.gl.disable(this.gl.BLEND);
         }
 
+        const vertexDefines: string[] = [];
+        const fragmentDefines: string[] = [];
+
+        // collect defines
+        if (material.pbrMetallicRoughness) {
+            if (material.pbrMetallicRoughness.hasOwnProperty("baseColorTexture")) {
+                fragmentDefines.push("HAS_BASE_COLOR_TEXTURE");
+            }
+        }
+        if (meshPrimitive.attributes.hasOwnProperty("TEXCOORD_0")) {
+            vertexDefines.push("HAS_UVS");
+        }
+
+        // get shaderInfo
+        const shaderInfo = this.shaderCache.getShaderProgram(vertexDefines, fragmentDefines);
+
+        // bind textures and update uniforms
         if (material.pbrMetallicRoughness) {
             if (material.pbrMetallicRoughness.hasOwnProperty("baseColorTexture")) {
                 const textureIdx = material.pbrMetallicRoughness.baseColorTexture.index;
@@ -271,59 +242,7 @@ export class Renderer {
                 }
             }
         }
-    }
-
-    private initShader(vertexSource: string, fragmentSource: string): ShaderInfo {
-        const vertexShader = this.loadShader(this.gl.VERTEX_SHADER, vertexSource);
-        const fragmentShader = this.loadShader(this.gl.FRAGMENT_SHADER, fragmentSource);
-
-        // create shader program
-        const shaderProgram = this.gl.createProgram();
-        this.gl.attachShader(shaderProgram, vertexShader);
-        this.gl.attachShader(shaderProgram, fragmentShader);
-        this.gl.linkProgram(shaderProgram);
-
-        // notify if creation failed and return null
-        if (!this.gl.getProgramParameter(shaderProgram, this.gl.LINK_STATUS)) {
-            alert(`An error occured while linking shader: ` + this.gl.getProgramInfoLog(shaderProgram));
-            return null;
-        }
-
-        const shaderInfo: ShaderInfo = {
-            program: shaderProgram,
-            attribLocations: {
-                POSITION: this.gl.getAttribLocation(shaderProgram, 'position'),
-                NORMAL: this.gl.getAttribLocation(shaderProgram, 'normal'),
-                TEXCOORD_0: this.gl.getAttribLocation(shaderProgram, 'texcoord0'),
-            },
-            uniformLocations: {
-                viewMatrix: this.gl.getUniformLocation(shaderProgram, 'viewMatrix'),
-                projectionMatrix: this.gl.getUniformLocation(shaderProgram, 'projectionMatrix'),
-                modelMatrix: this.gl.getUniformLocation(shaderProgram, 'modelMatrix'),
-                modelMatrixForNormal: this.gl.getUniformLocation(shaderProgram, 'modelMatrixForNormal'),
-                colorSampler: this.gl.getUniformLocation(shaderProgram, "colorSampler")
-            },
-        };
 
         return shaderInfo;
-    }
-
-    private loadShader(type: number /*vertex or fragment*/, source: string) {
-        const shader = this.gl.createShader(type);
-
-        // send the source to the shader object
-        this.gl.shaderSource(shader, source);
-
-        // compile the shader
-        this.gl.compileShader(shader);
-
-        // notify if compilation fails and return null
-        if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
-            alert(`An error occured compiling the shader: ` + this.gl.getShaderInfoLog(shader));
-            this.gl.deleteShader(shader);
-            return null;
-        }
-
-        return shader;
     }
 }
