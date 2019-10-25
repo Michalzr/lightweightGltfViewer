@@ -3,13 +3,15 @@ import { OrbitControls } from "./orbitControls.js"
 import { bindDragAndDrop } from "./dragAndDrop.js"
 import { GltfLoader } from "./gltfLoader.js"
 
+// Last time you implemented flat normals for when normals aren't provided.
+// Test it. One test on boombox turned out weird.
+
 // TODO:
 // - Color texture
 //       - use sampler values
 //       - implement fallback for when texture size is not power of two (only under some sampler conditions..)
 // - Implement environment light
 // - Implement other textures
-// - If there aren't normals in a primitive, compute them
 // - If there aren't tangents in a primitive, compute them
 
 // IDEAS:

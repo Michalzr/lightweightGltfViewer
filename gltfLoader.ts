@@ -3,6 +3,7 @@ import { NamedBlob, preprocessUri } from "./utils/fileUtils.js";
 import * as Mat4Math from "./utils/mathUtils/martix4.js";
 import * as Vec3Math from "./utils/mathUtils/vector3.js";
 import * as QuaternionMath from "./utils/mathUtils/quaternion.js";
+import { fillGltfDefaultValues } from "./gltfPostProcess.js"
 
 // the idea is to use the same structure as gltf, except:
 // - bufferViews are DataView objects
@@ -53,6 +54,8 @@ export class GltfLoader {
             await this.parseNonBinary(gltfFile, files) :
             await this.parseBinary(gltfFile, files);
         
+        fillGltfDefaultValues(loadedGltf);
+
         this.fitToView(loadedGltf);
 
         return loadedGltf;
@@ -220,11 +223,6 @@ export class GltfLoader {
     }
 
     private createImportData(gltfJson: GlTf.GlTf, buffers: ArrayBuffer[], images: HTMLImageElement[]): LoadedGltf {
-        // make sure every node has matrix
-        gltfJson.nodes.forEach(gltfNode => {
-            gltfNode.matrix = this.getMatrixForNode(gltfNode);
-        });
-
         // move "byteStride" from BufferView to Accessor
         gltfJson.accessors.forEach(gltfAccessor => {
             gltfAccessor.byteStride = gltfJson.bufferViews[gltfAccessor.bufferView].byteStride;
@@ -248,18 +246,6 @@ export class GltfLoader {
             const buffer = buffers[gltfBufferView.buffer];
             return new DataView(buffer, gltfBufferView.byteOffset, gltfBufferView.byteLength);
         });
-    }
-
-    private getMatrixForNode(node: GlTf.Node): Mat4Math.Mat4 {
-        if (node.matrix) {
-            return node.matrix as Mat4Math.Mat4;
-        } else {
-            const translation: Vec3Math.Vec3 = node.translation as Vec3Math.Vec3 || [0, 0, 0];
-            const rotation: QuaternionMath.Quaternion = node.rotation as QuaternionMath.Quaternion || QuaternionMath.create();
-            const scale: Vec3Math.Vec3 = node.scale as Vec3Math.Vec3 || [1, 1, 1];
-
-            return Mat4Math.fromTranslationRotationScale(translation, rotation, scale);
-        }
     }
 
     private fitToView(loadedGltf: LoadedGltf): void {
