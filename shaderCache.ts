@@ -1,7 +1,9 @@
 const vertexShaderSource = `
 attribute vec3 position;
 attribute vec3 normal;
-attribute vec2 texcoord0;
+#ifdef HAS_UVS
+    attribute vec2 texcoord0;
+#endif
 
 uniform mat4 modelMatrix;
 uniform mat3 modelMatrixForNormal;
@@ -24,18 +26,19 @@ void main() {
 const fragmentShaderSource = `
 precision mediump float;
 
+uniform vec4 color;
 uniform sampler2D colorSampler;
 
 varying vec3 vNormal;
 varying vec2 vTextureCoord;
 
 void main() {
-    vec4 texColor = vec4(1, 1, 1, 1);
+    vec4 fragColor = color;
     #ifdef HAS_BASE_COLOR_TEXTURE
-        texColor = texture2D(colorSampler, vTextureCoord);
+        fragColor = fragColor * texture2D(colorSampler, vTextureCoord);
     #endif
     float intensity = max(0.0, abs(dot(vNormal, vec3(0.0, 0.0, 1.0))));
-    gl_FragColor = vec4(texColor.xyz * intensity, texColor.w);
+    gl_FragColor = vec4(fragColor.xyz * intensity, fragColor.w);
 }
 `;
 
@@ -47,6 +50,7 @@ export interface ShaderInfo {
         TEXCOORD_0: GLint
     },
     uniformLocations: {
+        color: WebGLUniformLocation,
         colorSampler: WebGLUniformLocation,
         viewMatrix: WebGLUniformLocation,
         projectionMatrix: WebGLUniformLocation,
@@ -70,7 +74,7 @@ export class ShaderCache {
     }
 
     getShaderProgram(vertexDefines: string[], fragmentDefines: string[]): ShaderInfo {
-        const key = vertexDefines.toString() + "_" + fragmentDefines.toString();
+        const key = vertexDefines.toString() + "&" + fragmentDefines.toString();
 
         let shaderProgram = this.programs.get(key);
 
@@ -83,7 +87,7 @@ export class ShaderCache {
     }
 
     private getShader(shaderType: ShaderType, defines: string[]): WebGLShader {
-        const key = shaderType + defines.toString();
+        const key = shaderType + "&" + defines.toString();
         let shader = this.shaders.get(key);
 
         if (!shader) {
@@ -118,6 +122,7 @@ export class ShaderCache {
                 TEXCOORD_0: this.gl.getAttribLocation(shaderProgram, 'texcoord0'),
             },
             uniformLocations: {
+                color: this.gl.getUniformLocation(shaderProgram, 'color'),
                 viewMatrix: this.gl.getUniformLocation(shaderProgram, 'viewMatrix'),
                 projectionMatrix: this.gl.getUniformLocation(shaderProgram, 'projectionMatrix'),
                 modelMatrix: this.gl.getUniformLocation(shaderProgram, 'modelMatrix'),

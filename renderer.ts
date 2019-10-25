@@ -103,13 +103,17 @@ export class Renderer {
 
     private renderMeshPrimitive(meshPrimitive: GlTf.MeshPrimitive, modelMatrix: Mat4Math.Mat4, viewMatrix: Mat4Math.Mat4, projectionMatrix: Mat4Math.Mat4): void {
 
-        if (!meshPrimitive.hasOwnProperty("material")) {
+        if (!meshPrimitive.hasOwnProperty("material") || !this.gltf.materials[meshPrimitive.material].hasOwnProperty("pbrMetallicRoughness")) {
             return;
         }
 
+        // get shader program and use it
         const shaderInfo = this.getShaderInfo(this.gltf.materials[meshPrimitive.material], meshPrimitive);
+        this.gl.useProgram(shaderInfo.program);
 
-        this.gl.useProgram(shaderInfo.program); // if we really keep using only one shader, we can move this to initShader
+
+        // update uniforms
+        this.updateMaterialUniforms(shaderInfo, this.gltf.materials[meshPrimitive.material]);
 
         const inverseModelMatrix = Mat4Math.invert(modelMatrix);
         const transposedInversedModeMatrix = Mat4Math.transpose(inverseModelMatrix);
@@ -138,8 +142,10 @@ export class Renderer {
             }
         }
 
+
         // resolve attributes
         let vertexCount = 0;
+        const usedAttribLocations: number[] = [];
         for (let attribute in meshPrimitive.attributes) {
             if (!shaderInfo.attribLocations.hasOwnProperty(attribute)) {
                 continue;
@@ -172,8 +178,11 @@ export class Renderer {
                 accessor.byteOffset
             );
             this.gl.enableVertexAttribArray(attribLocation);
+            usedAttribLocations.push(attribLocation);
         }
 
+
+        // draw
         if (vertexCount > 0) {
             const renderMode = meshPrimitive.mode === undefined ? this.gl.TRIANGLES : meshPrimitive.mode;
             if (indexAccessor) {
@@ -182,10 +191,29 @@ export class Renderer {
                 this.gl.drawArrays(renderMode, 0, vertexCount);
             }
         }
+
+
+        // disable vertexAttribArrays
+        usedAttribLocations.forEach(attribLocation => {
+            this.gl.disableVertexAttribArray(attribLocation);
+        });
     }
 
-    // TODO: nicer handling of "defines"
     private getShaderInfo(material: GlTf.Material, meshPrimitive: GlTf.MeshPrimitive): ShaderInfo {
+        const vertexDefines: string[] = [];
+        const fragmentDefines: string[] = [];
+
+        if (material.pbrMetallicRoughness.hasOwnProperty("baseColorTexture")) {
+            fragmentDefines.push("HAS_BASE_COLOR_TEXTURE");
+        }
+        if (meshPrimitive.attributes.hasOwnProperty("TEXCOORD_0")) {
+            vertexDefines.push("HAS_UVS");
+        }
+
+        return this.shaderCache.getShaderProgram(vertexDefines, fragmentDefines);
+    }
+
+    private updateMaterialUniforms(shaderInfo: ShaderInfo, material: GlTf.Material): void {
         // set culling based on "doubleSided" property
         if (material.doubleSided) {
             this.gl.disable(this.gl.CULL_FACE);
@@ -204,45 +232,28 @@ export class Renderer {
             this.gl.disable(this.gl.BLEND);
         }
 
-        const vertexDefines: string[] = [];
-        const fragmentDefines: string[] = [];
-
-        // collect defines
-        if (material.pbrMetallicRoughness) {
-            if (material.pbrMetallicRoughness.hasOwnProperty("baseColorTexture")) {
-                fragmentDefines.push("HAS_BASE_COLOR_TEXTURE");
-            }
-        }
-        if (meshPrimitive.attributes.hasOwnProperty("TEXCOORD_0")) {
-            vertexDefines.push("HAS_UVS");
-        }
-
-        // get shaderInfo
-        const shaderInfo = this.shaderCache.getShaderProgram(vertexDefines, fragmentDefines);
-
         // bind textures and update uniforms
-        if (material.pbrMetallicRoughness) {
-            if (material.pbrMetallicRoughness.hasOwnProperty("baseColorTexture")) {
-                const textureIdx = material.pbrMetallicRoughness.baseColorTexture.index;
-                let webGLColorTexture = this.textureToWebGLTexture.get(textureIdx);
+        // color        
+        this.gl.uniform4fv(shaderInfo.uniformLocations.color, material.pbrMetallicRoughness.baseColorFactor || [1, 1, 1, 1]);
+        
+        if (material.pbrMetallicRoughness.hasOwnProperty("baseColorTexture")) {
+            const textureIdx = material.pbrMetallicRoughness.baseColorTexture.index;
+            let webGLColorTexture = this.textureToWebGLTexture.get(textureIdx);
 
-                if (!webGLColorTexture) {
-                    // initializing texture
-                    webGLColorTexture = this.gl.createTexture();
-                    this.textureToWebGLTexture.set(textureIdx, webGLColorTexture);
+            if (!webGLColorTexture) {
+                // initializing texture
+                webGLColorTexture = this.gl.createTexture();
+                this.textureToWebGLTexture.set(textureIdx, webGLColorTexture);
 
-                    const image = this.gltf.images[this.gltf.textures[textureIdx].source];
+                const image = this.gltf.images[this.gltf.textures[textureIdx].source];
 
-                    this.gl.bindTexture(this.gl.TEXTURE_2D, webGLColorTexture);
-                    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
-                    this.gl.generateMipmap(this.gl.TEXTURE_2D);
+                this.gl.bindTexture(this.gl.TEXTURE_2D, webGLColorTexture);
+                this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
+                this.gl.generateMipmap(this.gl.TEXTURE_2D);
 
-                } else {
-                    this.gl.bindTexture(this.gl.TEXTURE_2D, webGLColorTexture);
-                }
+            } else {
+                this.gl.bindTexture(this.gl.TEXTURE_2D, webGLColorTexture);
             }
         }
-
-        return shaderInfo;
     }
 }

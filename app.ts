@@ -4,7 +4,6 @@ import { bindDragAndDrop } from "./dragAndDrop.js"
 import { GltfLoader } from "./gltfLoader.js"
 
 // TODO:
-// - Try to clean up handling of "defines"
 // - Color texture
 //       - use sampler values
 //       - implement fallback for when texture size is not power of two (only under some sampler conditions..)
@@ -12,6 +11,13 @@ import { GltfLoader } from "./gltfLoader.js"
 // - Implement other textures
 // - If there aren't normals in a primitive, compute them
 // - If there aren't tangents in a primitive, compute them
+
+// IDEAS:
+// - fill default gltf values, so you don't need to check every time if property actually exists.. Properties that need this:
+//     - baseColorFactor: [1, 1, 1, 1]
+// - only update material uniforms when necessary
+// - implement extra level of shader caching - every mesh primitive remembers the shader it used - no need to collect "defines"
+// - only enable/disable vertexAttrib arrays when necessary
 
 function run() {
     const canvas = document.querySelector("#glCanvas") as HTMLCanvasElement;
