@@ -1,0 +1,228 @@
+{
+    "asset": {
+        "version": "2.0",
+        "generator": "VECTARY"
+    },
+    "nodes": [
+        {
+            "translation": [
+                0,
+                0,
+                0
+            ],
+            "scale": [
+                0.0006043084733986381,
+                0.0006043084733986381,
+                0.0006043084733986381
+            ],
+            "rotation": [
+                -0.7071067811865475,
+                0,
+                0,
+                0.7071067811865476
+            ],
+            "name": "Duck",
+            "children": [
+                1
+            ]
+        },
+        {
+            "translation": [
+                0,
+                0,
+                0
+            ],
+            "scale": [
+                1,
+                1,
+                1
+            ],
+            "rotation": [
+                0.7071067811865475,
+                0,
+                0,
+                0.7071067811865476
+            ],
+            "name": "LOD3spShape",
+            "mesh": 0
+        },
+        {
+            "translation": [
+                0.2121424901045101,
+                0.15849553634821628,
+                0.13704539418621783
+            ],
+            "scale": [
+                1,
+                1,
+                1
+            ],
+            "rotation": [
+                -0.2218469414210521,
+                0.460721325047839,
+                0.12011431856328086,
+                0.850936158418695
+            ],
+            "name": "Camera",
+            "camera": 0
+        }
+    ],
+    "materials": [
+        {
+            "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "baseColorTexture": {
+                    "index": 0,
+                    "extensions": {
+                        "KHR_texture_transform": {
+                            "offset": [
+                                0,
+                                0
+                            ],
+                            "scale": [
+                                1,
+                                1
+                            ],
+                            "rotation": 0
+                        }
+                    },
+                    "texCoord": 0
+                },
+                "metallicFactor": 0,
+                "roughnessFactor": 1
+            },
+            "name": "Material",
+            "emissiveFactor": [
+                0,
+                0,
+                0
+            ],
+            "alphaMode": "BLEND",
+            "doubleSided": false
+        }
+    ],
+    "textures": [
+        {
+            "sampler": 0,
+            "source": 0
+        }
+    ],
+    "images": [
+        {
+            "uri": "7dbd206b-4a11-4c9a-bd9e-0bb260355a38.png",
+            "mimeType": "image/png"
+        }
+    ],
+    "samplers": [
+        {
+            "wrapS": 10497,
+            "wrapT": 10497
+        }
+    ],
+    "meshes": [
+        {
+            "primitives": [
+                {
+                    "mode": 4,
+                    "attributes": {
+                        "POSITION": 0,
+                        "TEXCOORD_0": 2
+                    },
+                    "material": 0
+                }
+            ]
+        }
+    ],
+    "accessors": [
+        {
+            "bufferView": 0,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 12636,
+            "max": [
+                96.17990112304688,
+                163.97000122070312,
+                53.92519760131836
+            ],
+            "min": [
+                -69.29850006103516,
+                9.929369926452637,
+                -61.32819747924805
+            ],
+            "type": "VEC3"
+        },
+        {
+            "bufferView": 1,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 12636,
+            "type": "VEC3"
+        },
+        {
+            "bufferView": 2,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 12636,
+            "type": "VEC2"
+        }
+    ],
+    "bufferViews": [
+        {
+            "buffer": 0,
+            "byteOffset": 0,
+            "byteLength": 151632,
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 151632,
+            "byteLength": 151632,
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 303264,
+            "byteLength": 101088,
+            "target": 34962
+        }
+    ],
+    "cameras": [
+        {
+            "name": "Camera",
+            "type": "perspective",
+            "extras": {
+                "targetDistance": 0.2977915745481263
+            },
+            "perspective": {
+                "aspectRatio": 1.6247139588100687,
+                "yfov": 0.6108652381980153,
+                "zfar": 31.279207753604165,
+                "znear": 0.0021576029010277956
+            }
+        }
+    ],
+    "scene": 0,
+    "scenes": [
+        {
+            "nodes": [
+                0,
+                2
+            ],
+            "name": "Project Name"
+        }
+    ],
+    "extensionsUsed": [
+        "KHR_texture_transform"
+    ],
+    "buffers": [
+        {
+            "byteLength": 404352,
+            "uri": "ProjectName.bin"
+        }
+    ]
+}

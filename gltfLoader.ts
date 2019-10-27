@@ -1,9 +1,6 @@
 import * as GlTf from "./gltfInterface";
 import { NamedBlob, preprocessUri } from "./utils/fileUtils.js";
-import * as Mat4Math from "./utils/mathUtils/martix4.js";
-import * as Vec3Math from "./utils/mathUtils/vector3.js";
-import * as QuaternionMath from "./utils/mathUtils/quaternion.js";
-import { fillGltfDefaultValues } from "./gltfPostProcess.js"
+import * as GltfPostprocess from "./gltfPostProcess.js"
 
 // the idea is to use the same structure as gltf, except:
 // - bufferViews are DataView objects
@@ -54,9 +51,8 @@ export class GltfLoader {
             await this.parseNonBinary(gltfFile, files) :
             await this.parseBinary(gltfFile, files);
         
-        fillGltfDefaultValues(loadedGltf);
-
-        this.fitToView(loadedGltf);
+        GltfPostprocess.fillGltfDefaultValues(loadedGltf);
+        GltfPostprocess.fitToView(loadedGltf);
 
         return loadedGltf;
     }
@@ -247,70 +243,6 @@ export class GltfLoader {
             return new DataView(buffer, gltfBufferView.byteOffset, gltfBufferView.byteLength);
         });
     }
-
-    private fitToView(loadedGltf: LoadedGltf): void {
-        let min: Vec3Math.Vec3 = [Infinity, Infinity, Infinity];
-        let max: Vec3Math.Vec3 = [-Infinity, -Infinity, -Infinity];
-        
-        function processMesh(meshPrimitive: GlTf.MeshPrimitive, matrix: Mat4Math.Mat4) {
-            if (!meshPrimitive.attributes.hasOwnProperty("POSITION")) {
-                return;
-            }
-
-            const positionAttribute = loadedGltf.accessors[meshPrimitive.attributes["POSITION"]];
-
-            if (positionAttribute.hasOwnProperty("max") && positionAttribute.hasOwnProperty("min")) {
-                const localMax = Vec3Math.applyMatrix(positionAttribute.max as Vec3Math.Vec3, matrix);
-                const localMin = Vec3Math.applyMatrix(positionAttribute.min as Vec3Math.Vec3, matrix);
-    
-                max = [Math.max(max[0], localMax[0]), Math.max(max[1], localMax[1]), Math.max(max[2], localMax[2])];
-                max = [Math.max(max[0], localMin[0]), Math.max(max[1], localMin[1]), Math.max(max[2], localMin[2])];
-                min = [Math.min(min[0], localMin[0]), Math.min(min[1], localMin[1]), Math.min(min[2], localMin[2])];
-                min = [Math.min(min[0], localMax[0]), Math.min(min[1], localMax[1]), Math.min(min[2], localMax[2])];
-            
-            } else {
-                console.error("Min and max positions are undefined. Fitting will not work well.");
-            }
-        }
-
-        function processNode(node: GlTf.Node, parentMatrix: Mat4Math.Mat4) {
-            const matrix = Mat4Math.multiply(parentMatrix, node.matrix as Mat4Math.Mat4);
-            
-            if (node.children) {
-                node.children.forEach(nodeId => {
-                    processNode(loadedGltf.nodes[nodeId], matrix);
-                });
-            }
-
-            if (!node.hasOwnProperty("mesh")) {
-                return;
-            }
-
-            const meshPrimitives = loadedGltf.meshes[node.mesh].primitives;
-            meshPrimitives.forEach(meshPrimitive => processMesh(meshPrimitive, matrix));
-        }
-
-        loadedGltf.rootNodeIds.forEach(nodeId => {
-            processNode(loadedGltf.nodes[nodeId], Mat4Math.create());
-        });
-
-        if (min[0] < max[0]) {
-            const center = Vec3Math.multiplyScalar(Vec3Math.add(Vec3Math.clone(min), max), 1/2);
-            const size = Vec3Math.sub(Vec3Math.clone(max), min);
-            const maxSize = Math.max(Math.max(size[0], size[1]), size[2]);
-
-            const scale = Vec3Math.multiplyScalar([1, 1, 1], 1 / maxSize);
-            const translate = Vec3Math.multiply(Vec3Math.negate(center), scale);
-            const rotate = QuaternionMath.create();
-
-            const fitMatrix = Mat4Math.fromTranslationRotationScale(translate, rotate, scale);
-
-            loadedGltf.rootNodeIds.forEach(nodeId => {
-                loadedGltf.nodes[nodeId].matrix = Mat4Math.multiply(fitMatrix, loadedGltf.nodes[nodeId].matrix as Mat4Math.Mat4);
-            })
-        }
-    }
-
 
 
 

@@ -3,8 +3,7 @@ import { OrbitControls } from "./orbitControls.js"
 import { bindDragAndDrop } from "./dragAndDrop.js"
 import { GltfLoader } from "./gltfLoader.js"
 
-// Last time you implemented flat normals for when normals aren't provided.
-// Test it. One test on boombox turned out weird.
+// last time you imeplemented automatic normal computation. Next you should do the tangents
 
 // TODO:
 // - Color texture
