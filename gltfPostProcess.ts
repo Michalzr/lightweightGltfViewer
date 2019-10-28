@@ -117,58 +117,13 @@ function fillNormalData(loadedGltf: LoadedGltf): void {
         }
 
 
-        // load vertices
-        const positionAccessor = loadedGltf.accessors[meshPrimitive.attributes["POSITION"]];
-        const positionDataView = loadedGltf.dataViews[positionAccessor.bufferView];
-
-        const vertices = new Float32Array(positionAccessor.count * 3);
-
-        let pByteStride = positionAccessor.byteStride || (3 * 4);
-        let pIndex = positionAccessor.byteOffset || 0;
-
-        for (let i = 0; i < vertices.length; i += 3) {
-            vertices[i] = positionDataView.getFloat32(pIndex, true);
-            vertices[i + 1] = positionDataView.getFloat32(pIndex + 4, true);
-            vertices[i + 2] = positionDataView.getFloat32(pIndex + 8, true);
-
-            pIndex += pByteStride;
-        }
-
-
-        // load indices
-        let indices: Uint32Array;
-        if (meshPrimitive.hasOwnProperty("indices")) {
-            const indexAccessor = loadedGltf.accessors[meshPrimitive.indices];
-            const indexDataView = loadedGltf.dataViews[indexAccessor.bufferView];
-
-            let indexByteLenght = COMPONENT_BYTESIZE.get(indexAccessor.componentType);
-
-            indices = new Uint32Array(indexAccessor.count);
-
-            let iByteStride = indexAccessor.byteStride || indexByteLenght;
-            let iIndex = indexAccessor.byteOffset || 0;
-
-            let getNumber = (iIndex: number) => indexDataView.getUint32(iIndex, true);
-            if (indexByteLenght === 2) {
-                getNumber = (iIndex: number) => indexDataView.getUint16(iIndex, true);
-            } else if (indexByteLenght === 1) {
-                getNumber = (iIndex: number) => indexDataView.getUint8(iIndex);
-            }
-
-            for (let i = 0; i < indices.length; i++) {
-                indices[i] = getNumber(iIndex);
-                iIndex += iByteStride;
-            }
-        } else {
-            indices = new Uint32Array(positionAccessor.count);
-            for (let i = 0; i < indices.length; i++) {
-                indices[i] = i;
-            }
-        }
+        // load vertices and indices
+        const positions = getPositions(loadedGltf, meshPrimitive);
+        const indices = getIndices(loadedGltf, meshPrimitive);
 
 
         // generate normals
-        const normals = new Float32Array(positionAccessor.count * 3);
+        const normals = new Float32Array(positions.length);
 
         const h1: Vec3Math.Vec3 = [0, 0, 0]; // helper vectors
         const h2: Vec3Math.Vec3 = [0, 0, 0];
@@ -182,8 +137,8 @@ function fillNormalData(loadedGltf: LoadedGltf): void {
             }
 
             for (j = 0; j < 3; j++) {            
-                h1[j] = vertices[ti[1] + j] - vertices[ti[0] + j];
-                h2[j] = vertices[ti[2] + j] - vertices[ti[0] + j];
+                h1[j] = positions[ti[1] + j] - positions[ti[0] + j];
+                h2[j] = positions[ti[2] + j] - positions[ti[0] + j];
             }
 
             normal[0] = h1[1] * h2[2] - h1[2] * h2[1];
@@ -218,7 +173,7 @@ function fillNormalData(loadedGltf: LoadedGltf): void {
             bufferView: loadedGltf.dataViews.length - 1,
             componentType: 5126,
             normalized: true,
-            count: positionAccessor.count,
+            count: positions.length / 3,
             type: "VEC3"
         }
         loadedGltf.accessors.push(normalAccessor);
@@ -227,4 +182,140 @@ function fillNormalData(loadedGltf: LoadedGltf): void {
 
         cachedNormalAttributes.set(meshPrimitive.attributes["POSITION"], meshPrimitive.attributes["NORMAL"]);
     }
+}
+
+
+function fillTangentData(loadedGltf: LoadedGltf): void {
+    loadedGltf.meshes.forEach(mesh => {
+        mesh.primitives.forEach(generateTangents);
+    });
+
+    function generateTangents(meshPrimitive: GlTf.MeshPrimitive) {
+        if (meshPrimitive.attributes.hasOwnProperty("TANGENT") || !(meshPrimitive.attributes.hasOwnProperty("TEXCOORD_0"))) {
+            return;
+        }
+
+
+        // load vertices, indices, normals and uvs
+        const positions = getPositions(loadedGltf, meshPrimitive);
+        const indices = getIndices(loadedGltf, meshPrimitive);
+        const normals = getNormals(loadedGltf, meshPrimitive);
+        const uvs = getUVs(loadedGltf, meshPrimitive);
+
+
+        // generate tangents
+        // TODO
+        const tangents = new Float32Array(positions.length * 4 / 3);
+
+
+        // write tangent accessor to gltf
+        const tangentDataView = new DataView(tangents.buffer);
+        loadedGltf.dataViews.push(tangentDataView);
+
+        const tangentAccessor = {
+            bufferView: loadedGltf.dataViews.length - 1,
+            componentType: 5126,
+            normalized: true,
+            count: tangents.length / 4,
+            type: "VEC4"
+        }
+        loadedGltf.accessors.push(tangentAccessor);
+
+        meshPrimitive.attributes.TANGENT = loadedGltf.accessors.length - 1;
+    }
+}
+
+function getPositions(loadedGltf: LoadedGltf, meshPrimitive: GlTf.MeshPrimitive): Float32Array {
+    const positionAccessor = loadedGltf.accessors[meshPrimitive.attributes["POSITION"]];
+    const positionDataView = loadedGltf.dataViews[positionAccessor.bufferView];
+
+    const positions = new Float32Array(positionAccessor.count * 3);
+
+    const pByteStride = positionAccessor.byteStride || (3 * 4);
+    let pIndex = positionAccessor.byteOffset || 0;
+
+    for (let i = 0; i < positions.length; i += 3) {
+        positions[i] = positionDataView.getFloat32(pIndex, true);
+        positions[i + 1] = positionDataView.getFloat32(pIndex + 4, true);
+        positions[i + 2] = positionDataView.getFloat32(pIndex + 8, true);
+
+        pIndex += pByteStride;
+    }
+
+    return positions;
+}
+
+function getNormals(loadedGltf: LoadedGltf, meshPrimitive: GlTf.MeshPrimitive): Float32Array {
+    const normalAccessor = loadedGltf.accessors[meshPrimitive.attributes["NORMAL"]];
+    const normalDataView = loadedGltf.dataViews[normalAccessor.bufferView];
+
+    const normals = new Float32Array(normalAccessor.count * 3);
+
+    const pByteStride = normalAccessor.byteStride || (3 * 4);
+    let pIndex = normalAccessor.byteOffset || 0;
+
+    for (let i = 0; i < normals.length; i += 3) {
+        normals[i] = normalDataView.getFloat32(pIndex, true);
+        normals[i + 1] = normalDataView.getFloat32(pIndex + 4, true);
+        normals[i + 2] = normalDataView.getFloat32(pIndex + 8, true);
+
+        pIndex += pByteStride;
+    }
+
+    return normals;
+}
+
+function getUVs(loadedGltf: LoadedGltf, meshPrimitive: GlTf.MeshPrimitive): Float32Array {
+    const uvAccessor = loadedGltf.accessors[meshPrimitive.attributes["TEXCOORD_0"]];
+    const uvDataView = loadedGltf.dataViews[uvAccessor.bufferView];
+
+    const uvs = new Float32Array(uvAccessor.count * 2);
+
+    const pByteStride = uvAccessor.byteStride || (2 * 4);
+    let pIndex = uvAccessor.byteOffset || 0;
+
+    for (let i = 0; i < uvs.length; i += 2) {
+        uvs[i] = uvDataView.getFloat32(pIndex, true);
+        uvs[i + 1] = uvDataView.getFloat32(pIndex + 4, true);
+
+        pIndex += pByteStride;
+    }
+
+    return uvs;
+}
+
+function getIndices(loadedGltf: LoadedGltf, meshPrimitive: GlTf.MeshPrimitive): Uint32Array {
+    let indices: Uint32Array;
+
+    if (meshPrimitive.hasOwnProperty("indices")) {
+        const indexAccessor = loadedGltf.accessors[meshPrimitive.indices];
+        const indexDataView = loadedGltf.dataViews[indexAccessor.bufferView];
+
+        let indexByteLenght = COMPONENT_BYTESIZE.get(indexAccessor.componentType);
+
+        indices = new Uint32Array(indexAccessor.count);
+
+        let iByteStride = indexAccessor.byteStride || indexByteLenght;
+        let iIndex = indexAccessor.byteOffset || 0;
+
+        let getNumber = (iIndex: number) => indexDataView.getUint32(iIndex, true);
+        if (indexByteLenght === 2) {
+            getNumber = (iIndex: number) => indexDataView.getUint16(iIndex, true);
+        } else if (indexByteLenght === 1) {
+            getNumber = (iIndex: number) => indexDataView.getUint8(iIndex);
+        }
+
+        for (let i = 0; i < indices.length; i++) {
+            indices[i] = getNumber(iIndex);
+            iIndex += iByteStride;
+        }
+
+    } else {
+        indices = new Uint32Array(loadedGltf.accessors[meshPrimitive.attributes["POSITION"]].count);
+        for (let i = 0; i < indices.length; i++) {
+            indices[i] = i;
+        }
+    }
+
+    return indices;
 }
