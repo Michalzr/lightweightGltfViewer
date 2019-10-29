@@ -11,7 +11,9 @@ export function fillGltfDefaultValues(loadedGltf: LoadedGltf): void {
 
     // make sure every geometry has normals
     fillNormalData(loadedGltf);
-        
+ 
+    // make sure every geometry that has UVs, has also tangents
+    fillTangentData(loadedGltf);
 }
 
 // resize and move the loaded scene so it fits default orbit controls setup (fit in 1x1x1 box with center in (0,0,0))
@@ -99,6 +101,16 @@ const COMPONENT_BYTESIZE: Map<number, number> = new Map([
     [5126, 4]
 ]);
 
+const NUMBER_OF_COMPONENTS: Map<string, number> = new Map([
+    ["SCALAR", 1],
+    ["VEC2", 2],
+    ["VEC3", 3],
+    ["VEC4", 4],
+    ["MAT2", 4],
+    ["MAT3", 9],
+    ["MAT4", 16]
+]);
+
 function fillNormalData(loadedGltf: LoadedGltf): void {
     const cachedNormalAttributes = new Map<number, number>();
 
@@ -118,7 +130,7 @@ function fillNormalData(loadedGltf: LoadedGltf): void {
 
 
         // load vertices and indices
-        const positions = getPositions(loadedGltf, meshPrimitive);
+        const positions = getTypedArray(loadedGltf, meshPrimitive, "POSITION");
         const indices = getIndices(loadedGltf, meshPrimitive);
 
 
@@ -129,7 +141,7 @@ function fillNormalData(loadedGltf: LoadedGltf): void {
         const h2: Vec3Math.Vec3 = [0, 0, 0];
         const normal: Vec3Math.Vec3 = [0, 0, 0];
         const ti: [number, number, number] = [0, 0, 0]; // triangle indices
-        let j, k: number;
+        let j: number, k: number;
 
         for (let i = 0; i < indices.length; i += 3) {
             for (j = 0; j < 3; j++) {
@@ -186,6 +198,8 @@ function fillNormalData(loadedGltf: LoadedGltf): void {
 
 
 function fillTangentData(loadedGltf: LoadedGltf): void {
+    const cachedTangentAttributes = new Map<string, number>();
+
     loadedGltf.meshes.forEach(mesh => {
         mesh.primitives.forEach(generateTangents);
     });
@@ -195,93 +209,146 @@ function fillTangentData(loadedGltf: LoadedGltf): void {
             return;
         }
 
+        const tangentsCacheKey = meshPrimitive.attributes["POSITION"] + "_" +
+            meshPrimitive.indices + "_" +
+            meshPrimitive.attributes["NORMAL"] + "_" +
+            meshPrimitive.attributes["TEXCOORD_0"];
+
+        if (cachedTangentAttributes.has(tangentsCacheKey)) {
+            meshPrimitive.attributes.TANGENT = cachedTangentAttributes.get(tangentsCacheKey);
+            return;
+        }
 
         // load vertices, indices, normals and uvs
-        const positions = getPositions(loadedGltf, meshPrimitive);
+        const positions = getTypedArray(loadedGltf, meshPrimitive, "POSITION");
         const indices = getIndices(loadedGltf, meshPrimitive);
-        const normals = getNormals(loadedGltf, meshPrimitive);
-        const uvs = getUVs(loadedGltf, meshPrimitive);
+        const normals = getTypedArray(loadedGltf, meshPrimitive, "NORMAL");
+        const uvs = getTypedArray(loadedGltf, meshPrimitive, "TEXCOORD_0");
 
 
-        // generate tangents
-        // TODO
-        const tangents = new Float32Array(positions.length * 4 / 3);
+        // generate tangents (inspired by THREE.js BufferGeometryUtil)
+        const tangents1 = new Float32Array(positions.length * 4 / 3);
+        const tangents2 = new Float32Array(positions.length * 4 / 3);
+        let x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, s1: number, t1: number, s2: number, t2: number, r: number;
+
+		function handleTriangle(viA: number, viB: number, viC: number) {
+			x1 = positions[viB * 3 + 0] - positions[viA * 3 + 0];
+            y1 = positions[viB * 3 + 1] - positions[viA * 3 + 1];
+            z1 = positions[viB * 3 + 2] - positions[viA * 3 + 2];
+                    
+            x2 = positions[viC * 3 + 0] - positions[viA * 3 + 0];
+            y2 = positions[viC * 3 + 1] - positions[viA * 3 + 1];
+            z2 = positions[viC * 3 + 2] - positions[viA * 3 + 2];
+
+            s1 = uvs[viB * 2] - uvs[viA * 2];
+            t1 = uvs[viB * 2 + 1] - uvs[viA * 2 + 1];
+
+            s2 = uvs[viC * 2] - uvs[viA * 2];
+            t2 = uvs[viC * 2 + 1] - uvs[viA * 2 + 1];
+
+			r = 1.0 / ( s1 * t2 - s2 * t1 );
+
+            for (let vi of [viA, viB, viC]) {
+                tangents1[vi * 4 + 0] += ( t2 * x1 - t1 * x2 ) * r;
+                tangents1[vi * 4 + 1] += ( t2 * y1 - t1 * y2 ) * r;
+                tangents1[vi * 4 + 2] += ( t2 * z1 - t1 * z2 ) * r;
+    
+                tangents2[vi * 4 + 0] += ( s1 * x2 - s2 * x1 ) * r;
+                tangents2[vi * 4 + 1] += ( s1 * y2 - s2 * y1 ) * r;
+                tangents2[vi * 4 + 2] += ( s1 * z2 - s2 * z1 ) * r;
+            }
+		}
+
+		for (var i = 0; i < indices.length; i += 3) {
+            handleTriangle(indices[i], indices[ i + 1 ], indices[ i + 2 ]);
+		}
+
+        const n: Vec3Math.Vec3 = [0, 0, 0];
+        const tangent1: Vec3Math.Vec3 = [0, 0, 0];
+        const tangent2: Vec3Math.Vec3 = [0, 0, 0];
+        const tmp: Vec3Math.Vec3 = [0, 0, 0];
+        const tmp2: Vec3Math.Vec3 = [0, 0, 0];
+        let test: number, w: number;
+
+		function handleVertex(vIndex: number) {
+            n[0] = normals[vIndex * 3];
+            n[1] = normals[vIndex * 3 + 1];
+            n[2] = normals[vIndex * 3 + 2];
+
+            tangent1[0] = tangents1[vIndex * 4];
+            tangent1[1] = tangents1[vIndex * 4 + 1];
+            tangent1[2] = tangents1[vIndex * 4 + 2];
+
+            tangent2[0] = tangents2[vIndex * 4];
+            tangent2[1] = tangents2[vIndex * 4 + 1];
+            tangent2[2] = tangents2[vIndex * 4 + 2];
+
+			// Gram-Schmidt orthogonalize
+            Vec3Math.copy(tmp, tangent1);
+            Vec3Math.copy(tmp2, n);
+            Vec3Math.sub(tmp, Vec3Math.multiplyScalar(tmp2, Vec3Math.dot(tmp2, tangent1))); 
+            Vec3Math.normalize(tmp);
+
+			// Calculate handedness
+			Vec3Math.cross(n, tangent1, tmp2);
+			test = Vec3Math.dot(tmp2, tangent2);
+			w = ( test < 0.0 ) ? - 1.0 : 1.0;
+
+			tangents1[ vIndex * 4 ] = tmp[0];
+			tangents1[ vIndex * 4 + 1 ] = tmp[1];
+			tangents1[ vIndex * 4 + 2 ] = tmp[2];
+			tangents1[ vIndex * 4 + 3 ] = w;
+		}
+
+		for (let i = 0; i < indices.length; i ++) {
+            handleVertex(indices[i]);
+		}
 
 
         // write tangent accessor to gltf
-        const tangentDataView = new DataView(tangents.buffer);
+        const tangentDataView = new DataView(tangents1.buffer);
         loadedGltf.dataViews.push(tangentDataView);
 
         const tangentAccessor = {
             bufferView: loadedGltf.dataViews.length - 1,
             componentType: 5126,
-            normalized: true,
-            count: tangents.length / 4,
+            count: tangents1.length / 4,
             type: "VEC4"
         }
         loadedGltf.accessors.push(tangentAccessor);
 
         meshPrimitive.attributes.TANGENT = loadedGltf.accessors.length - 1;
+
+        cachedTangentAttributes.set(tangentsCacheKey, meshPrimitive.attributes["TANGENT"]);
     }
 }
 
-function getPositions(loadedGltf: LoadedGltf, meshPrimitive: GlTf.MeshPrimitive): Float32Array {
-    const positionAccessor = loadedGltf.accessors[meshPrimitive.attributes["POSITION"]];
-    const positionDataView = loadedGltf.dataViews[positionAccessor.bufferView];
+function getTypedArray(loadedGltf: LoadedGltf, meshPrimitive: GlTf.MeshPrimitive, attributeName: "POSITION" | "NORMAL" | "TEXCOORD_0"): Float32Array {
+    const dataAccessor = loadedGltf.accessors[meshPrimitive.attributes[attributeName]];
+    const dataView = loadedGltf.dataViews[dataAccessor.bufferView];
 
-    const positions = new Float32Array(positionAccessor.count * 3);
+    const componentByteLenght = COMPONENT_BYTESIZE.get(dataAccessor.componentType);
+    const numberOfComponents = NUMBER_OF_COMPONENTS.get(dataAccessor.type);
+    const elementByteStride = dataAccessor.byteStride || componentByteLenght * numberOfComponents;
+    let elementIndex = dataAccessor.byteOffset || 0;
 
-    const pByteStride = positionAccessor.byteStride || (3 * 4);
-    let pIndex = positionAccessor.byteOffset || 0;
+    const result = new Float32Array(dataAccessor.count * numberOfComponents);
 
-    for (let i = 0; i < positions.length; i += 3) {
-        positions[i] = positionDataView.getFloat32(pIndex, true);
-        positions[i + 1] = positionDataView.getFloat32(pIndex + 4, true);
-        positions[i + 2] = positionDataView.getFloat32(pIndex + 8, true);
-
-        pIndex += pByteStride;
+    let getNumber = (iIndex: number) => dataView.getFloat32(iIndex, true);
+    if (componentByteLenght === 2) {
+        getNumber = (iIndex: number) => dataView.getUint16(iIndex, true);
+    } else if (componentByteLenght === 1) {
+        getNumber = (iIndex: number) => dataView.getUint8(iIndex);
     }
 
-    return positions;
-}
-
-function getNormals(loadedGltf: LoadedGltf, meshPrimitive: GlTf.MeshPrimitive): Float32Array {
-    const normalAccessor = loadedGltf.accessors[meshPrimitive.attributes["NORMAL"]];
-    const normalDataView = loadedGltf.dataViews[normalAccessor.bufferView];
-
-    const normals = new Float32Array(normalAccessor.count * 3);
-
-    const pByteStride = normalAccessor.byteStride || (3 * 4);
-    let pIndex = normalAccessor.byteOffset || 0;
-
-    for (let i = 0; i < normals.length; i += 3) {
-        normals[i] = normalDataView.getFloat32(pIndex, true);
-        normals[i + 1] = normalDataView.getFloat32(pIndex + 4, true);
-        normals[i + 2] = normalDataView.getFloat32(pIndex + 8, true);
-
-        pIndex += pByteStride;
+    for (let i = 0, j = 0; i < result.length; i += numberOfComponents) {
+        for (j = 0; j < numberOfComponents; j++) {
+            result[i + j] = getNumber(elementIndex + j * componentByteLenght);
+        }
+        elementIndex += elementByteStride;
     }
 
-    return normals;
-}
-
-function getUVs(loadedGltf: LoadedGltf, meshPrimitive: GlTf.MeshPrimitive): Float32Array {
-    const uvAccessor = loadedGltf.accessors[meshPrimitive.attributes["TEXCOORD_0"]];
-    const uvDataView = loadedGltf.dataViews[uvAccessor.bufferView];
-
-    const uvs = new Float32Array(uvAccessor.count * 2);
-
-    const pByteStride = uvAccessor.byteStride || (2 * 4);
-    let pIndex = uvAccessor.byteOffset || 0;
-
-    for (let i = 0; i < uvs.length; i += 2) {
-        uvs[i] = uvDataView.getFloat32(pIndex, true);
-        uvs[i + 1] = uvDataView.getFloat32(pIndex + 4, true);
-
-        pIndex += pByteStride;
-    }
-
-    return uvs;
+    return result;
 }
 
 function getIndices(loadedGltf: LoadedGltf, meshPrimitive: GlTf.MeshPrimitive): Uint32Array {

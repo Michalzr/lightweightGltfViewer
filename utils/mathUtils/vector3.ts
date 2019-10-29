@@ -6,6 +6,13 @@ export function clone(a: Vec3): Vec3 {
     return a.slice() as Vec3;
 }
 
+export function copy(a: Vec3, b: Vec3): Vec3 {
+    a[0] = b[0];
+    a[1] = b[1];
+    a[2] = b[2];
+    return a as Vec3;
+}
+
 export function add(a: Vec3, b: Vec3): Vec3 {
     a[0] += b[0];
     a[1] += b[1];
@@ -18,6 +25,10 @@ export function sub(a: Vec3, b: Vec3): Vec3 {
     a[1] -= b[1];
     a[2] -= b[2];
     return a;
+}
+
+export function dot(a: Vec3, b: Vec3): number {
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
 export function multiply(a: Vec3, b: Vec3): Vec3 {
