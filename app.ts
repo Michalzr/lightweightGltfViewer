@@ -3,8 +3,8 @@ import { OrbitControls } from "./orbitControls.js"
 import { bindDragAndDrop } from "./dragAndDrop.js"
 import { GltfLoader } from "./gltfLoader.js"
 
-// last time you imeplemented automatic tangent computation. There is no way to test this until normal mapping is implemented
-// => next time do normal mapping
+// last time you imeplemented normal mapping, it doesn't work well
+// when you're done with that, test tangent computation
 
 // TODO:
 // - Color texture

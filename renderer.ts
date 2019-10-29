@@ -206,6 +206,9 @@ export class Renderer {
         if (material.pbrMetallicRoughness.hasOwnProperty("baseColorTexture")) {
             fragmentDefines.push("HAS_BASE_COLOR_TEXTURE");
         }
+        if (material.hasOwnProperty("normalTexture")) {
+            fragmentDefines.push("HAS_NORMAL_TEXTURE");
+        }
         if (meshPrimitive.attributes.hasOwnProperty("TEXCOORD_0")) {
             vertexDefines.push("HAS_UVS");
         }
@@ -232,10 +235,14 @@ export class Renderer {
             this.gl.disable(this.gl.BLEND);
         }
 
+
         // bind textures and update uniforms
         // color        
         this.gl.uniform4fv(shaderInfo.uniformLocations.color, material.pbrMetallicRoughness.baseColorFactor || [1, 1, 1, 1]);
         
+
+        // init textures
+        // TODO: move somewhere else
         if (material.pbrMetallicRoughness.hasOwnProperty("baseColorTexture")) {
             const textureIdx = material.pbrMetallicRoughness.baseColorTexture.index;
             let webGLColorTexture = this.textureToWebGLTexture.get(textureIdx);
@@ -250,10 +257,38 @@ export class Renderer {
                 this.gl.bindTexture(this.gl.TEXTURE_2D, webGLColorTexture);
                 this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
                 this.gl.generateMipmap(this.gl.TEXTURE_2D);
-
-            } else {
-                this.gl.bindTexture(this.gl.TEXTURE_2D, webGLColorTexture);
             }
+        }
+
+        if (material.hasOwnProperty("normalTexture")) {
+            const textureIdx = material.normalTexture.index;
+            let webGLNormalTexture = this.textureToWebGLTexture.get(textureIdx);
+
+            if (!webGLNormalTexture) {
+                // initializing texture
+                webGLNormalTexture = this.gl.createTexture();
+                this.textureToWebGLTexture.set(textureIdx, webGLNormalTexture);
+
+                const image = this.gltf.images[this.gltf.textures[textureIdx].source];
+
+                this.gl.bindTexture(this.gl.TEXTURE_2D, webGLNormalTexture);
+                this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
+                this.gl.generateMipmap(this.gl.TEXTURE_2D);
+            }
+        }
+
+
+        // update texture uniforms
+        if (material.pbrMetallicRoughness.hasOwnProperty("baseColorTexture")) {
+            this.gl.uniform1i(shaderInfo.uniformLocations.colorSampler, 0);
+            this.gl.activeTexture(this.gl.TEXTURE0);
+            this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureToWebGLTexture.get(material.pbrMetallicRoughness.baseColorTexture.index));
+        }
+
+        if (material.hasOwnProperty("normalTexture")) {
+            this.gl.uniform1i(shaderInfo.uniformLocations.normalSampler, 1);
+            this.gl.activeTexture(this.gl.TEXTURE1);
+            this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureToWebGLTexture.get(material.normalTexture.index));
         }
     }
 }

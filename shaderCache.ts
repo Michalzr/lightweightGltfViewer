@@ -3,6 +3,7 @@ attribute vec3 position;
 attribute vec3 normal;
 #ifdef HAS_UVS
     attribute vec2 texcoord0;
+    attribute vec4 tangent;
 #endif
 
 uniform mat4 modelMatrix;
@@ -12,12 +13,21 @@ uniform mat4 projectionMatrix;
 
 varying vec3 vNormal;
 varying vec2 vTextureCoord;
+#ifdef HAS_UVS
+    varying mat3 TBN;
+#endif
 
 void main() {
-    vNormal = normalize(mat3(viewMatrix) * modelMatrixForNormal * normal);
     vTextureCoord = vec2(0,0);
     #ifdef HAS_UVS
         vTextureCoord = texcoord0;
+        vNormal = normalize(mat3(viewMatrix) * modelMatrixForNormal * normal);
+
+        vec3 bitangent = cross(normal, tangent.xyz) * tangent.w;
+        vec3 T = normalize(modelMatrix * vec4(tangent.xyz, 0.0)).xyz;
+        vec3 B = normalize(modelMatrix * vec4(bitangent, 0.0)).xyz;
+        vec3 N = normalize(modelMatrixForNormal * normal);
+        TBN = mat3(viewMatrix * modelMatrix) * mat3(T, B, N);
     #endif
     gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position.xyz, 1);
 }
@@ -27,17 +37,33 @@ const fragmentShaderSource = `
 precision mediump float;
 
 uniform vec4 color;
-uniform sampler2D colorSampler;
+#ifdef HAS_BASE_COLOR_TEXTURE
+    uniform sampler2D colorSampler;
+#endif
+#ifdef HAS_NORMAL_TEXTURE
+    uniform sampler2D normalSampler;
+#endif
 
 varying vec3 vNormal;
 varying vec2 vTextureCoord;
+#ifdef HAS_NORMAL_TEXTURE
+    varying mat3 TBN;
+#endif
 
 void main() {
     vec4 fragColor = color;
     #ifdef HAS_BASE_COLOR_TEXTURE
         fragColor = fragColor * texture2D(colorSampler, vTextureCoord);
     #endif
-    float intensity = max(0.0, abs(dot(vNormal, vec3(0.0, 0.0, 1.0))));
+
+    vec3 normal = vNormal;
+    #ifdef HAS_NORMAL_TEXTURE
+        normal = texture2D(normalSampler, vTextureCoord).xyz;
+        normal = TBN * normal;
+        normal = normalize(normal);
+    #endif
+
+    float intensity = max(0.0, abs(dot(normal, vec3(0.0, 0.0, 1.0))));
     gl_FragColor = vec4(fragColor.xyz * intensity, fragColor.w);
 }
 `;
@@ -47,11 +73,13 @@ export interface ShaderInfo {
     attribLocations: {
         POSITION: GLint,
         NORMAL: GLint,
+        TANGENT: GLint,
         TEXCOORD_0: GLint
     },
     uniformLocations: {
         color: WebGLUniformLocation,
         colorSampler: WebGLUniformLocation,
+        normalSampler: WebGLUniformLocation,
         viewMatrix: WebGLUniformLocation,
         projectionMatrix: WebGLUniformLocation,
         modelMatrix: WebGLUniformLocation,
@@ -119,6 +147,7 @@ export class ShaderCache {
             attribLocations: {
                 POSITION: this.gl.getAttribLocation(shaderProgram, 'position'),
                 NORMAL: this.gl.getAttribLocation(shaderProgram, 'normal'),
+                TANGENT: this.gl.getAttribLocation(shaderProgram, 'tangent'),
                 TEXCOORD_0: this.gl.getAttribLocation(shaderProgram, 'texcoord0'),
             },
             uniformLocations: {
@@ -127,7 +156,8 @@ export class ShaderCache {
                 projectionMatrix: this.gl.getUniformLocation(shaderProgram, 'projectionMatrix'),
                 modelMatrix: this.gl.getUniformLocation(shaderProgram, 'modelMatrix'),
                 modelMatrixForNormal: this.gl.getUniformLocation(shaderProgram, 'modelMatrixForNormal'),
-                colorSampler: this.gl.getUniformLocation(shaderProgram, "colorSampler")
+                colorSampler: this.gl.getUniformLocation(shaderProgram, "colorSampler"),
+                normalSampler: this.gl.getUniformLocation(shaderProgram, "normalSampler")
             },
         };
 
