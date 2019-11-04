@@ -3,9 +3,6 @@ import { OrbitControls } from "./orbitControls.js"
 import { bindDragAndDrop } from "./dragAndDrop.js"
 import { GltfLoader } from "./gltfLoader.js"
 
-// last time you imeplemented normal mapping, it doesn't work well
-// when you're done with that, test tangent computation
-
 // TODO:
 // - Color texture
 //       - use sampler values

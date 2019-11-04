@@ -113,6 +113,7 @@ export class Renderer {
 
 
         // update uniforms
+        this.initMaterialTextures(this.gltf.materials[meshPrimitive.material]);
         this.updateMaterialUniforms(shaderInfo, this.gltf.materials[meshPrimitive.material]);
 
         const inverseModelMatrix = Mat4Math.invert(modelMatrix);
@@ -216,33 +217,7 @@ export class Renderer {
         return this.shaderCache.getShaderProgram(vertexDefines, fragmentDefines);
     }
 
-    private updateMaterialUniforms(shaderInfo: ShaderInfo, material: GlTf.Material): void {
-        // set culling based on "doubleSided" property
-        if (material.doubleSided) {
-            this.gl.disable(this.gl.CULL_FACE);
-        } else {
-            this.gl.enable(this.gl.CULL_FACE);
-            this.gl.cullFace(this.gl.BACK);
-        }
-
-        // set blending based on alpha mode
-        // TODO: imeplement "MASK" with alpha cutoff. You'll have to do it manually in a shader
-        // TODO: also implement ordering opaque objects based on distance from camera
-        if (material.alphaMode === "BLEND") {
-            this.gl.enable(this.gl.BLEND);
-            this.gl.blendFuncSeparate(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA, this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA);
-        } else {
-            this.gl.disable(this.gl.BLEND);
-        }
-
-
-        // bind textures and update uniforms
-        // color        
-        this.gl.uniform4fv(shaderInfo.uniformLocations.color, material.pbrMetallicRoughness.baseColorFactor || [1, 1, 1, 1]);
-        
-
-        // init textures
-        // TODO: move somewhere else
+    private initMaterialTextures(material: GlTf.Material): void {
         if (material.pbrMetallicRoughness.hasOwnProperty("baseColorTexture")) {
             const textureIdx = material.pbrMetallicRoughness.baseColorTexture.index;
             let webGLColorTexture = this.textureToWebGLTexture.get(textureIdx);
@@ -276,15 +251,37 @@ export class Renderer {
                 this.gl.generateMipmap(this.gl.TEXTURE_2D);
             }
         }
+    }
+
+    private updateMaterialUniforms(shaderInfo: ShaderInfo, material: GlTf.Material): void {
+        // set culling based on "doubleSided" property
+        if (material.doubleSided) {
+            this.gl.disable(this.gl.CULL_FACE);
+        } else {
+            this.gl.enable(this.gl.CULL_FACE);
+            this.gl.cullFace(this.gl.BACK);
+        }
+
+        // set blending based on alpha mode
+        // TODO: imeplement "MASK" with alpha cutoff. You'll have to do it manually in a shader
+        // TODO: also implement ordering opaque objects based on distance from camera
+        if (material.alphaMode === "BLEND") {
+            this.gl.enable(this.gl.BLEND);
+            this.gl.blendFuncSeparate(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA, this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA);
+        } else {
+            this.gl.disable(this.gl.BLEND);
+        }
 
 
-        // update texture uniforms
+        // color uniforms
+        this.gl.uniform4fv(shaderInfo.uniformLocations.color, material.pbrMetallicRoughness.baseColorFactor || [1, 1, 1, 1]);
         if (material.pbrMetallicRoughness.hasOwnProperty("baseColorTexture")) {
             this.gl.uniform1i(shaderInfo.uniformLocations.colorSampler, 0);
             this.gl.activeTexture(this.gl.TEXTURE0);
             this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureToWebGLTexture.get(material.pbrMetallicRoughness.baseColorTexture.index));
         }
 
+        // normal uniforms
         if (material.hasOwnProperty("normalTexture")) {
             this.gl.uniform1i(shaderInfo.uniformLocations.normalSampler, 1);
             this.gl.activeTexture(this.gl.TEXTURE1);

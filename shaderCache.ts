@@ -18,16 +18,15 @@ varying vec2 vTextureCoord;
 #endif
 
 void main() {
+    vNormal = normalize(mat3(viewMatrix) * modelMatrixForNormal * normal);
+
     vTextureCoord = vec2(0,0);
     #ifdef HAS_UVS
         vTextureCoord = texcoord0;
-        vNormal = normalize(mat3(viewMatrix) * modelMatrixForNormal * normal);
-
-        vec3 bitangent = cross(normal, tangent.xyz) * tangent.w;
-        vec3 T = normalize(modelMatrix * vec4(tangent.xyz, 0.0)).xyz;
-        vec3 B = normalize(modelMatrix * vec4(bitangent, 0.0)).xyz;
-        vec3 N = normalize(modelMatrixForNormal * normal);
-        TBN = mat3(viewMatrix * modelMatrix) * mat3(T, B, N);
+        
+        vec3 T = normalize(mat3(viewMatrix * modelMatrix) * tangent.xyz);
+        vec3 B = cross(vNormal, T) * tangent.w;
+        TBN = mat3(T, B, vNormal);
     #endif
     gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position.xyz, 1);
 }
@@ -59,8 +58,8 @@ void main() {
     vec3 normal = vNormal;
     #ifdef HAS_NORMAL_TEXTURE
         normal = texture2D(normalSampler, vTextureCoord).xyz;
-        normal = TBN * normal;
-        normal = normalize(normal);
+        normal = normalize(normal * 2.0 - 1.0);
+        normal = normalize(TBN * normal);
     #endif
 
     float intensity = max(0.0, abs(dot(normal, vec3(0.0, 0.0, 1.0))));
