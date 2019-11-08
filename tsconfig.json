@@ -10,6 +10,6 @@
         "outDir": "./build",
     },
     "include": [
-        "app.ts"
+        "src/app.ts"
     ]
 }
