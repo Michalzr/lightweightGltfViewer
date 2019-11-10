@@ -2,6 +2,7 @@ import { Renderer } from "./renderer.js"
 import { OrbitControls } from "./orbitControls.js"
 import { bindDragAndDrop } from "./dragAndDrop.js"
 import { GltfLoader } from "./gltfLoader.js"
+import { NamedBlob } from "./utils/fileUtils.js";
 
 // TODO:
 // - Color texture
@@ -20,6 +21,7 @@ import { GltfLoader } from "./gltfLoader.js"
 
 function run() {
     const canvas = document.querySelector("#glCanvas") as HTMLCanvasElement;
+    const modelSelect = document.querySelector("#modelSelect") as HTMLSelectElement;
 
     const renderer = new Renderer(canvas);
     const orbitControls = new OrbitControls(canvas);
@@ -29,6 +31,18 @@ function run() {
         renderer.setGltf(loadedGltf);
         renderer.render(orbitControls.getViewMatrix());
     });
+
+    // bind model select
+    const loadSelectedModel = async () => {
+        const fileResponse = await fetch(modelSelect.value);
+        const file = await fileResponse.blob();
+        const loadedGltf = await new GltfLoader().load([new NamedBlob(file, modelSelect.value)]);
+
+        renderer.setGltf(loadedGltf);
+        renderer.render(orbitControls.getViewMatrix());
+    }
+    modelSelect.addEventListener("change", loadSelectedModel);
+    loadSelectedModel();
 
     orbitControls.sigChange.connect(() => {
         // instead of having render loop, we only render when moving camera
