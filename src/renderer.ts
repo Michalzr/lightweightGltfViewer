@@ -59,13 +59,14 @@ export class Renderer {
     render(viewMatrix: Mat4Math.Mat4) {
         // update projectionmatrix
         const fieldOfView = 45 * Math.PI / 180;   // in radians
-        const aspect = this.gl.canvas.clientWidth / this.gl.canvas.clientHeight;
+        const aspect = this.gl.canvas.width / this.gl.canvas.height;
         const zNear = 0.1;
         const zFar = 100.0;
         const projectionMatrix = Mat4Math.perspective(fieldOfView, aspect, zNear, zFar);
 
 
         // clear canvas
+        this.gl.viewport(0, 0, this.gl.canvas.width, this.gl.canvas.height);
         this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
         this.gl.clearDepth(1.0);
         this.gl.enable(this.gl.DEPTH_TEST);

@@ -43,6 +43,13 @@ export class OrbitControls {
         // canvas.addEventListener( 'touchmove', onTouchMove, false );
     }
 
+    resetCamera(): void {
+        this.target = [0, 0, 0];
+        this.radius = 2;
+        this.phi = Math.PI / 4;
+        this.theta = Math.PI / 4;
+    }
+
     getViewMatrix(): Mat4Math.Mat4 {
         return Mat4Math.invert(this.getCameraMatrix());
     }
