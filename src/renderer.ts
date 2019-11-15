@@ -39,18 +39,6 @@ export class Renderer {
         this.shaderCache = new ShaderCache(this.gl);
     }
 
-    deleteBuffersAndTextures(): void {
-        this.dataViewToWebGLBuffer.forEach((webGLBuffer, dataViewIdx) => {
-            this.gl.deleteBuffer(webGLBuffer);
-        });
-        this.dataViewToWebGLBuffer.clear();
-        
-        this.textureToWebGLTexture.forEach((WebGLTexture, dataViewIdx) => {
-            this.gl.deleteTexture(WebGLTexture);
-        });
-        this.textureToWebGLTexture.clear();
-    }
-
     setGltf(loadedGltf: LoadedGltf): void {
         this.deleteBuffersAndTextures();
         this.gltf = loadedGltf;
@@ -81,6 +69,18 @@ export class Renderer {
         this.gltf.rootNodeIds.forEach(nodeId => {
             this.renderNode(this.gltf.nodes[nodeId], Mat4Math.create(), viewMatrix, projectionMatrix);
         });
+    }
+
+    private deleteBuffersAndTextures(): void {
+        this.dataViewToWebGLBuffer.forEach((webGLBuffer, dataViewIdx) => {
+            this.gl.deleteBuffer(webGLBuffer);
+        });
+        this.dataViewToWebGLBuffer.clear();
+        
+        this.textureToWebGLTexture.forEach((WebGLTexture, dataViewIdx) => {
+            this.gl.deleteTexture(WebGLTexture);
+        });
+        this.textureToWebGLTexture.clear();
     }
 
     private renderNode(node: GlTf.Node, parentModelMatrix: Mat4Math.Mat4, viewMatrix: Mat4Math.Mat4, projectionMatrix: Mat4Math.Mat4): void {
