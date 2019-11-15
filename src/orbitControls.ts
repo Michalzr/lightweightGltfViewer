@@ -18,7 +18,9 @@ export class OrbitControls {
 
     private rotateStart: Vec2Math.Vec2 = [0, 0];
     private panStart: Vec2Math.Vec2 = [0, 0];
+    private pinchStart: number = 0;
 
+    private radiusStart: number = 0;
     private targetStart: Vec3Math.Vec3 = [0, 0, 0];
     private phiStart: number = 0;
     private thetaStart: number = 0;
@@ -36,11 +38,7 @@ export class OrbitControls {
 
         canvas.addEventListener('mousedown', this.onMouseDown, false);
         canvas.addEventListener('wheel', this.onMouseWheel, false);
-
-        // TODO: touch devices
-        // canvas.addEventListener( 'touchstart', onTouchStart, false );
-        // canvas.addEventListener( 'touchend', onTouchEnd, false );
-        // canvas.addEventListener( 'touchmove', onTouchMove, false );
+        canvas.addEventListener( 'touchstart', this.onTouchStart, false );
     }
 
     resetCamera(): void {
@@ -69,6 +67,8 @@ export class OrbitControls {
         return cameraMatrix;
     }
 
+
+    // ---------------- mouse event handling
     private onMouseDown = (event: MouseEvent) => {
         // Prevent the browser from scrolling.
         event.preventDefault();
@@ -81,17 +81,17 @@ export class OrbitControls {
         switch (event.button) {
             case 0: // left
                 if (event.ctrlKey || event.metaKey || event.shiftKey) {
-                    this.handleMouseDownPan(event);
+                    this.handleMouseDownPan(event.clientX, event.clientY);
                     this.state = OrbitControlsState.PAN;
 
                 } else {
-                    this.handleMouseDownRotate(event);
+                    this.handleMouseDownRotate(event.clientX, event.clientY);
                     this.state = OrbitControlsState.ROTATE;
                 }
                 break;
 
             case 2: // right
-                this.handleMouseDownPan(event);
+                this.handleMouseDownPan(event.clientX, event.clientY);
                 this.state = OrbitControlsState.PAN;
                 break;
 
@@ -108,25 +108,23 @@ export class OrbitControls {
 
         switch (this.state) {
             case OrbitControlsState.ROTATE:
-                this.handleMouseMoveRotate(event);
+                this.handleMouseMoveRotate(event.clientX, event.clientY);
                 break;
 
             case OrbitControlsState.PAN:
-                this.handleMouseMovePan(event);
+                this.handleMouseMovePan(event.clientX, event.clientY);
                 break;
         }
     }
 
     private onMouseUp = (event: MouseEvent) => {
-        this.handleMouseUp(event);
+        this.handleMouseUp();
 
         document.removeEventListener('mousemove', this.onMouseMove, false);
         document.removeEventListener('mouseup', this.onMouseUp, false);
 
         this.state = OrbitControlsState.NONE;
     }
-
-
 
     private onMouseWheel = (event: MouseWheelEvent) => {
         // TODO: is this condition necessary?
@@ -139,27 +137,86 @@ export class OrbitControls {
     }
 
 
+    // ---------------- touch event handling
+    private onTouchStart = (event: TouchEvent) => {
+        this.canvas.focus ? this.canvas.focus() : window.focus();
 
-    // ---------------- mouse down
-    private handleMouseDownRotate(event: MouseEvent): void {
-        this.rotateStart[0] = event.clientX;
-        this.rotateStart[1] = event.clientY;
+        switch (event.touches.length) {
+            case 1:
+                this.handleMouseDownRotate(event.touches[0].clientX, event.touches[0].clientY);
+                this.state = OrbitControlsState.ROTATE;
+                break;
+
+            case 2:
+                this.handlePinchStart(
+                    event.touches[0].clientX - event.touches[1].clientX,
+                    event.touches[0].clientY - event.touches[1].clientY)
+                this.handleMouseDownPan(
+                    (event.touches[0].clientX + event.touches[1].clientX) * 0.5,
+                    (event.touches[0].clientY + event.touches[1].clientY) * 0.5);
+                this.state = OrbitControlsState.PAN;
+                break;
+
+        }
+
+        if (this.state !== OrbitControlsState.NONE) {
+            document.addEventListener('touchmove', this.onTouchMove, false);
+            document.addEventListener('touchend', this.onTouchEnd, false);
+        }
+    }
+    
+    private onTouchMove = (event: TouchEvent) => {
+        switch (this.state) {
+            case OrbitControlsState.ROTATE:
+                this.handleMouseMoveRotate(event.touches[0].clientX, event.touches[0].clientY);
+                break;
+
+            case OrbitControlsState.PAN:
+                this.handlePinchMove(
+                    event.touches[0].clientX - event.touches[1].clientX,
+                    event.touches[0].clientY - event.touches[1].clientY)
+                this.handleMouseMovePan(
+                    (event.touches[0].clientX + event.touches[1].clientX) * 0.5,
+                    (event.touches[0].clientY + event.touches[1].clientY) * 0.5);
+                break;
+        }
+    }
+
+    private onTouchEnd = (event: TouchEvent) => {
+        this.handleMouseUp();
+
+        document.removeEventListener('touchmove', this.onTouchMove, false);
+        document.removeEventListener('touchend', this.onTouchEnd, false);
+
+        this.state = OrbitControlsState.NONE;
+    }
+
+
+    // ---------------- mouse/touch down
+    private handleMouseDownRotate(x: number, y: number): void {
+        this.rotateStart[0] = x;
+        this.rotateStart[1] = y;
 
         this.thetaStart = this.theta;
         this.phiStart = this.phi;
     }
 
-    private handleMouseDownPan(event: MouseEvent): void {
-        this.panStart[0] = event.clientX;
-        this.panStart[1] = event.clientY;
+    private handleMouseDownPan(x: number, y: number): void {
+        this.panStart[0] = x;
+        this.panStart[1] = y;
 
         this.targetStart = Vec3Math.clone(this.target);
     }
 
+    private handlePinchStart(x: number, y: number): void {
+        this.pinchStart = Vec2Math.length([x, y]);
+        this.radiusStart = this.radius;
+    }
 
-    // ---------------- mouse move
-    private handleMouseMoveRotate(event: MouseEvent): void {
-        const rotateEnd: Vec2Math.Vec2 = [event.clientX, event.clientY];
+
+    // ---------------- mouse/touch move
+    private handleMouseMoveRotate(x: number, y: number): void {
+        const rotateEnd: Vec2Math.Vec2 = [x, y];
         const rotateDelta = Vec2Math.sub(rotateEnd, this.rotateStart);
 
         this.theta = this.thetaStart + 2 * Math.PI * rotateDelta[0] / this.canvas.clientHeight; // yes, height
@@ -170,8 +227,8 @@ export class OrbitControls {
         this.sigChange.emit();
     }
 
-    private handleMouseMovePan(event: MouseEvent): void {
-        const panEnd: Vec2Math.Vec2 = [event.clientX, event.clientY];
+    private handleMouseMovePan(x: number, y: number): void {
+        const panEnd: Vec2Math.Vec2 = [x, y];
         const panDelta = Vec2Math.sub(panEnd, this.panStart);
         Vec2Math.multiplyScalar(panDelta, this.radius / this.canvas.clientHeight);
 
@@ -184,9 +241,16 @@ export class OrbitControls {
         this.sigChange.emit();
     }
 
+    private handlePinchMove(x: number, y: number): void {
+        const radiusDelta = this.pinchStart / Vec2Math.length([x, y]);
+        this.radius = this.radiusStart * radiusDelta;
 
-    // ---------------- mouse up
-    private handleMouseUp(event: MouseEvent): void {
+        this.sigChange.emit();
+    }
+
+
+    // ---------------- mouse/touch up
+    private handleMouseUp(): void {
         // nothing..
     }
 
