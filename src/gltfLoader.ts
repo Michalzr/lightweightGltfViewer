@@ -1,6 +1,7 @@
 import * as GlTf from "./gltfInterface";
 import { NamedBlob, preprocessUri } from "./utils/fileUtils.js";
-import * as GltfPostprocess from "./gltfPostProcess.js"
+import * as GltfPostprocess from "./gltfPostProcess.js";
+import * as Mat4Math from "./utils/mathUtils/martix4.js";
 
 // the idea is to use the same structure as gltf, except:
 // - bufferViews are DataView objects
@@ -16,22 +17,16 @@ export interface LoadedGltf {
     accessors?: Accessor[];
     dataViews?: DataView[];
     images?: HTMLImageElement[];
+    skins?: Skin[];
 }
 
 export interface Accessor extends GlTf.Accessor {
     byteStride?: number;
 }
 
-
-// static NUMBER_OF_COMPONENTS: Map<string, number> = new Map([
-//     ["SCALAR", 1],
-//     ["VEC2", 2],
-//     ["VEC3", 3],
-//     ["VEC4", 4],
-//     ["MAT2", 4],
-//     ["MAT3", 9],
-//     ["MAT4", 16]
-// ]);
+export interface Skin extends GlTf.Skin {
+    inverseBindMatricesData?: Mat4Math.Mat4[];
+}
 
 export class GltfLoader {
     private static readonly gltfExtension = ".gltf";
@@ -233,7 +228,8 @@ export class GltfLoader {
             samplers: gltfJson.samplers,
             images: images,
             accessors: gltfJson.accessors as Accessor[],
-            dataViews: this.createDataViews(gltfJson, buffers)
+            dataViews: this.createDataViews(gltfJson, buffers),
+            skins: gltfJson.skins
         }
     }
 

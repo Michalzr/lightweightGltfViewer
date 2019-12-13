@@ -604,7 +604,7 @@ export interface Scene {
 /**
  * Joints and matrices defining a skin.
  */
-interface Skin {
+export interface Skin {
   /**
    * The index of the accessor containing the floating-point 4x4 inverse-bind matrices.  The default is that each matrix is a 4x4 identity matrix, which implies that inverse-bind matrices were pre-applied.
    */

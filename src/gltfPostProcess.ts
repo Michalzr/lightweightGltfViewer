@@ -14,6 +14,9 @@ export function fillGltfDefaultValues(loadedGltf: LoadedGltf): void {
  
     // make sure every geometry that has UVs, has also tangents
     fillTangentData(loadedGltf);
+
+    // read the bind pose data to a more readable form - array of matrices
+    fillBindPoseData(loadedGltf);
 }
 
 // resize and move the loaded scene so it fits default orbit controls setup (fit in 1x1x1 box with center in (0,0,0))
@@ -130,7 +133,7 @@ function fillNormalData(loadedGltf: LoadedGltf): void {
 
 
         // load vertices and indices
-        const positions = getTypedArray(loadedGltf, meshPrimitive, "POSITION");
+        const positions = getTypedArray(loadedGltf, meshPrimitive.attributes["POSITION"]);
         const indices = getIndices(loadedGltf, meshPrimitive);
 
 
@@ -220,10 +223,10 @@ function fillTangentData(loadedGltf: LoadedGltf): void {
         }
 
         // load vertices, indices, normals and uvs
-        const positions = getTypedArray(loadedGltf, meshPrimitive, "POSITION");
+        const positions = getTypedArray(loadedGltf, meshPrimitive.attributes["POSITION"]);
         const indices = getIndices(loadedGltf, meshPrimitive);
-        const normals = getTypedArray(loadedGltf, meshPrimitive, "NORMAL");
-        const uvs = getTypedArray(loadedGltf, meshPrimitive, "TEXCOORD_0");
+        const normals = getTypedArray(loadedGltf, meshPrimitive.attributes["NORMAL"]);
+        const uvs = getTypedArray(loadedGltf, meshPrimitive.attributes["TEXCOORD_0"]);
 
 
         // generate tangents (inspired by THREE.js BufferGeometryUtil)
@@ -323,8 +326,24 @@ function fillTangentData(loadedGltf: LoadedGltf): void {
     }
 }
 
-function getTypedArray(loadedGltf: LoadedGltf, meshPrimitive: GlTf.MeshPrimitive, attributeName: "POSITION" | "NORMAL" | "TEXCOORD_0"): Float32Array {
-    const dataAccessor = loadedGltf.accessors[meshPrimitive.attributes[attributeName]];
+function fillBindPoseData(loadedGltf: LoadedGltf): void {
+    if (loadedGltf.skins) {
+        loadedGltf.skins.forEach(skin => {
+            if (skin.hasOwnProperty("inverseBindMatrices")) {
+                const matricesTypedArray = getTypedArray(loadedGltf, skin.inverseBindMatrices);
+                const matricesArray: Mat4Math.Mat4[] = new Array(matricesTypedArray.length / 16);
+                for (let i = 0; i < matricesArray.length; i ++) {
+                    matricesArray[i] = Array.prototype.slice.call(matricesTypedArray, i * 16, (i + 1) * 16);
+                }
+        
+                skin.inverseBindMatricesData = matricesArray;
+            }
+        });
+    }
+}
+
+function getTypedArray(loadedGltf: LoadedGltf, accessorIdx: number): Float32Array {
+    const dataAccessor = loadedGltf.accessors[accessorIdx];
     const dataView = loadedGltf.dataViews[dataAccessor.bufferView];
 
     const componentByteLenght = COMPONENT_BYTESIZE.get(dataAccessor.componentType);

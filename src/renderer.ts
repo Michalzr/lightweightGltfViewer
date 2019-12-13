@@ -22,6 +22,8 @@ export class Renderer {
     private dataViewToWebGLBuffer = new Map<number, WebGLBuffer>();
     private textureToWebGLTexture = new Map<number, WebGLTexture>();
 
+    private nodeGlobalMatrices: Mat4Math.Mat4[] = [];
+
     constructor(canvas: HTMLCanvasElement) {
         // Initialize the GL context
         this.gl = canvas.getContext("webgl");
@@ -42,6 +44,7 @@ export class Renderer {
     setGltf(loadedGltf: LoadedGltf): void {
         this.deleteBuffersAndTextures();
         this.gltf = loadedGltf;
+        this.updateNodeGlobalMatrices();
     }
 
     render(viewMatrix: Mat4Math.Mat4) {
@@ -66,8 +69,8 @@ export class Renderer {
             return;
         }
 
-        this.gltf.rootNodeIds.forEach(nodeId => {
-            this.renderNode(this.gltf.nodes[nodeId], Mat4Math.create(), viewMatrix, projectionMatrix);
+        this.gltf.nodes.forEach((node, nodeIdx) => {
+            this.renderNode(nodeIdx, viewMatrix, projectionMatrix);
         });
     }
 
@@ -83,26 +86,23 @@ export class Renderer {
         this.textureToWebGLTexture.clear();
     }
 
-    private renderNode(node: GlTf.Node, parentModelMatrix: Mat4Math.Mat4, viewMatrix: Mat4Math.Mat4, projectionMatrix: Mat4Math.Mat4): void {
-        const modelMatrix = Mat4Math.multiply(parentModelMatrix, node.matrix as Mat4Math.Mat4);
+    private renderNode(nodeIdx: number, viewMatrix: Mat4Math.Mat4, projectionMatrix: Mat4Math.Mat4): void {
+        const node = this.gltf.nodes[nodeIdx];
+        
+        if (this.nodeGlobalMatrices[nodeIdx]) { // node is referred to from the scene
+            if (node.hasOwnProperty("mesh") && this.nodeGlobalMatrices[nodeIdx]) {
+                const bones = node.hasOwnProperty("skin") ? this.getBones(nodeIdx) : null;
 
-        if (node.hasOwnProperty("children")) {
-            node.children.forEach(chIdx => {
-                this.renderNode(this.gltf.nodes[chIdx], modelMatrix, viewMatrix, projectionMatrix);
-            });
+                // node has a mesh, and it is referenced from the scene
+                const meshPrimitives = this.gltf.meshes[node.mesh].primitives;
+                meshPrimitives.forEach(meshPrimitive => {
+                    this.renderMeshPrimitive(meshPrimitive, this.nodeGlobalMatrices[nodeIdx], viewMatrix, projectionMatrix, bones);
+                });
+            }
         }
-
-        if (!node.hasOwnProperty("mesh")) {
-            return;
-        }
-
-        const meshPrimitives = this.gltf.meshes[node.mesh].primitives;
-        meshPrimitives.forEach(meshPrimitive => {
-            this.renderMeshPrimitive(meshPrimitive, modelMatrix, viewMatrix, projectionMatrix);
-        });
     }
 
-    private renderMeshPrimitive(meshPrimitive: GlTf.MeshPrimitive, modelMatrix: Mat4Math.Mat4, viewMatrix: Mat4Math.Mat4, projectionMatrix: Mat4Math.Mat4): void {
+    private renderMeshPrimitive(meshPrimitive: GlTf.MeshPrimitive, modelMatrix: Mat4Math.Mat4, viewMatrix: Mat4Math.Mat4, projectionMatrix: Mat4Math.Mat4, bones: Float32Array): void {
 
         if (!meshPrimitive.hasOwnProperty("material") || !this.gltf.materials[meshPrimitive.material].hasOwnProperty("pbrMetallicRoughness")) {
             return;
@@ -126,6 +126,9 @@ export class Renderer {
         this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.modelMatrix, false, modelMatrix);
         this.gl.uniformMatrix3fv(shaderInfo.uniformLocations.modelMatrixForNormal, false, modelMatrixForNormal);
 
+        if (meshPrimitive.attributes.hasOwnProperty("JOINTS_0") && bones) {
+            this.gl.uniformMatrix4fv(shaderInfo.uniformLocations.bones, false, bones);
+        }
 
         // resolve indices
         const indexAccessor = this.gltf.accessors[meshPrimitive.indices];
@@ -214,6 +217,9 @@ export class Renderer {
         if (meshPrimitive.attributes.hasOwnProperty("TEXCOORD_0")) {
             vertexDefines.push("HAS_UVS");
         }
+        if (meshPrimitive.attributes.hasOwnProperty("JOINTS_0")) {
+            vertexDefines.push("HAS_SKINNING");
+        }
 
         return this.shaderCache.getShaderProgram(vertexDefines, fragmentDefines);
     }
@@ -288,5 +294,47 @@ export class Renderer {
             this.gl.activeTexture(this.gl.TEXTURE1);
             this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureToWebGLTexture.get(material.normalTexture.index));
         }
+    }
+
+    private updateNodeGlobalMatrices(): void {
+        const processNode = (nodeId: number, parentModelMatrix: Mat4Math.Mat4) => {
+            const node = this.gltf.nodes[nodeId];
+            const modelMatrix = Mat4Math.multiply(parentModelMatrix, node.matrix as Mat4Math.Mat4);
+            this.nodeGlobalMatrices[nodeId] = modelMatrix;
+
+            if (node.hasOwnProperty("children")) {
+                for (let chId of node.children) {
+                    processNode(chId, modelMatrix);
+                }
+            }
+        };
+        
+        this.gltf.rootNodeIds.forEach(nodeId => {
+            processNode(nodeId, Mat4Math.create());
+        });
+    }
+
+    private getBones(nodeIdx: number): Float32Array {
+        const node = this.gltf.nodes[nodeIdx];
+        const inverseNodeGlobalMatrix = Mat4Math.invert(this.nodeGlobalMatrices[nodeIdx]);
+        const skin = this.gltf.skins[node.skin];
+
+        if (skin.joints.length > 20) {
+            window.alert("number of bones in the file is bigger than 20, which is max supported number.");
+            return;
+        }
+
+        const result = new Float32Array(20 * 16);
+
+        for (let i = 0; i < skin.joints.length; i++) {
+            let matrix = Mat4Math.multiply(inverseNodeGlobalMatrix, this.nodeGlobalMatrices[skin.joints[i]]);
+            if (skin.hasOwnProperty("inverseBindMatricesData")) {
+                matrix = Mat4Math.multiply(matrix, skin.inverseBindMatricesData[i]);
+            }
+
+            result.set(matrix, i * 16);
+        }
+
+        return result;
     }
 }

@@ -1,3 +1,6 @@
+// 20 skinning matrices is a random number I picked.
+// TODO: investigate on how much uniforms devices support nowadays
+// if it's not much, then pass the bone matrices as a texture instead.
 const vertexShaderSource = `
 attribute vec3 position;
 attribute vec3 normal;
@@ -5,11 +8,18 @@ attribute vec3 normal;
     attribute vec2 texcoord0;
     attribute vec4 tangent;
 #endif
+#ifdef HAS_SKINNING
+    attribute vec4 weights0;
+    attribute vec4 joints0;
+#endif
 
 uniform mat4 modelMatrix;
 uniform mat3 modelMatrixForNormal;
 uniform mat4 viewMatrix;
 uniform mat4 projectionMatrix;
+#ifdef HAS_SKINNING
+    uniform mat4 bones[20];
+#endif
 
 varying vec3 vNormal;
 varying vec2 vTextureCoord;
@@ -18,17 +28,26 @@ varying vec2 vTextureCoord;
 #endif
 
 void main() {
-    vNormal = normalize(mat3(viewMatrix) * modelMatrixForNormal * normal);
+    mat4 skinningMatrix = mat4(1,0,0,0,  0,1,0,0,  0,0,1,0,  0,0,0,1);
 
+    #ifdef HAS_SKINNING
+        skinningMatrix = bones[int(joints0[0])] * weights0[0] +
+            bones[int(joints0[1])] * weights0[1] +
+            bones[int(joints0[2])] * weights0[2] +
+            bones[int(joints0[3])] * weights0[3];
+    #endif
+
+    vNormal = normalize(mat3(viewMatrix) * modelMatrixForNormal * mat3(skinningMatrix) * normal);
     vTextureCoord = vec2(0,0);
+
     #ifdef HAS_UVS
         vTextureCoord = texcoord0;
-        
-        vec3 T = normalize(mat3(viewMatrix * modelMatrix) * tangent.xyz);
+
+        vec3 T = normalize(mat3(viewMatrix * modelMatrix * skinningMatrix) * tangent.xyz);
         vec3 B = cross(vNormal, T) * tangent.w;
         TBN = mat3(T, B, vNormal);
     #endif
-    gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position.xyz, 1);
+    gl_Position = projectionMatrix * viewMatrix * modelMatrix * skinningMatrix * vec4(position.xyz, 1);
 }
 `;
 
@@ -73,7 +92,9 @@ export interface ShaderInfo {
         POSITION: GLint,
         NORMAL: GLint,
         TANGENT: GLint,
-        TEXCOORD_0: GLint
+        TEXCOORD_0: GLint,
+        JOINTS_0: GLint,
+        WEIGHTS_0: GLint
     },
     uniformLocations: {
         color: WebGLUniformLocation,
@@ -83,6 +104,7 @@ export interface ShaderInfo {
         projectionMatrix: WebGLUniformLocation,
         modelMatrix: WebGLUniformLocation,
         modelMatrixForNormal: WebGLUniformLocation,
+        bones: WebGLUniformLocation,
     },
 }
 
@@ -148,6 +170,8 @@ export class ShaderCache {
                 NORMAL: this.gl.getAttribLocation(shaderProgram, 'normal'),
                 TANGENT: this.gl.getAttribLocation(shaderProgram, 'tangent'),
                 TEXCOORD_0: this.gl.getAttribLocation(shaderProgram, 'texcoord0'),
+                JOINTS_0: this.gl.getAttribLocation(shaderProgram, 'joints0'),
+                WEIGHTS_0: this.gl.getAttribLocation(shaderProgram, 'weights0'),
             },
             uniformLocations: {
                 color: this.gl.getUniformLocation(shaderProgram, 'color'),
@@ -156,7 +180,8 @@ export class ShaderCache {
                 modelMatrix: this.gl.getUniformLocation(shaderProgram, 'modelMatrix'),
                 modelMatrixForNormal: this.gl.getUniformLocation(shaderProgram, 'modelMatrixForNormal'),
                 colorSampler: this.gl.getUniformLocation(shaderProgram, "colorSampler"),
-                normalSampler: this.gl.getUniformLocation(shaderProgram, "normalSampler")
+                normalSampler: this.gl.getUniformLocation(shaderProgram, "normalSampler"),
+                bones: this.gl.getUniformLocation(shaderProgram, "bones")
             },
         };
 
