@@ -82,3 +82,14 @@ export function applyMatrix(v: Vec3, m: Mat4Math.Mat4): Vec3 {
 
     return v;
 }
+
+export function lerp(a: Vec3, b: Vec3, t: number, out: Vec3 = [0, 0, 0]): Vec3 {
+    copy(out, a);
+    const bClone = clone(b);
+
+    multiplyScalar(out, 1 - t);
+    multiplyScalar(bClone, t);
+    add(out, bClone);
+
+    return out;
+}

@@ -17,6 +17,8 @@ import { NamedBlob } from "./utils/fileUtils.js";
 // - implement extra level of shader caching - every mesh primitive remembers the shader it used - no need to collect "defines" every frame
 // - only enable/disable vertexAttrib arrays when necessary
 
+// 8, 5, 4, 2
+
 function run() {
     const canvas = document.querySelector("#glCanvas") as HTMLCanvasElement;
     const modelSelect = document.querySelector("#modelSelect") as HTMLSelectElement;
@@ -24,24 +26,24 @@ function run() {
     const renderer = new Renderer(canvas);
     const orbitControls = new OrbitControls(canvas);
 
-    function render() {
-        renderer.render(orbitControls.getViewMatrix());
+    function requestRender() {
+        renderer.requestRender(orbitControls.getViewMatrix());
     }
 
     async function loadFiles(files: NamedBlob[]) {
         const loadedGltf = await new GltfLoader().load(files);
         orbitControls.resetCamera();
         renderer.setGltf(loadedGltf);
-        render();
+        requestRender();
     }
 
     // bind the UI
-    bindResize(canvas, render);
+    bindResize(canvas, requestRender);
     bindDragAndDrop(canvas, loadFiles);
     bindModelSelect(modelSelect, loadFiles);
 
     // instead of having render loop, we only render when moving camera
-    orbitControls.sigChange.connect(render);
+    orbitControls.sigChange.connect(requestRender);
 }
 
 run();

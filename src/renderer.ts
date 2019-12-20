@@ -2,6 +2,7 @@ import * as Mat4Math from "./utils/mathUtils/martix4.js";
 import { LoadedGltf } from "./gltfLoader.js"
 import * as GlTf from "./gltfInterface.js";
 import { ShaderCache, ShaderInfo } from "./shaderCache.js"
+import { Animator } from "./animator.js"
 
 
 export class Renderer {
@@ -15,12 +16,17 @@ export class Renderer {
         ["MAT4", 16]
     ]);
 
+    private renderRequested: boolean = false;
+
     private gl: WebGLRenderingContext;
     private shaderCache: ShaderCache;
 
     private gltf: LoadedGltf;
     private dataViewToWebGLBuffer = new Map<number, WebGLBuffer>();
     private textureToWebGLTexture = new Map<number, WebGLTexture>();
+
+    private animator: Animator;
+    private viewMatrix: Mat4Math.Mat4;
 
     private nodeGlobalMatrices: Mat4Math.Mat4[] = [];
 
@@ -39,20 +45,45 @@ export class Renderer {
 
         // init shader
         this.shaderCache = new ShaderCache(this.gl);
+
+        this.renderLoop();
+    }
+
+    requestRender(viewMatrix: Mat4Math.Mat4 = this.viewMatrix): void {
+        this.viewMatrix = viewMatrix;
+        this.renderRequested = true;
     }
 
     setGltf(loadedGltf: LoadedGltf): void {
         this.deleteBuffersAndTextures();
         this.gltf = loadedGltf;
         this.updateNodeGlobalMatrices();
+
+        if (this.gltf.animations) {
+            this.animator = new Animator(this.gltf);
+        }
     }
 
-    render(viewMatrix: Mat4Math.Mat4) {
+    private renderLoop = () => {
+        if (this.renderRequested) {
+            this.renderRequested = false;
+            this.render(this.viewMatrix);
+        }
+        window.requestAnimationFrame(this.renderLoop);
+    }
+
+    private render(viewMatrix: Mat4Math.Mat4): void {
+        if (this.animator) {
+            this.animator.animate();
+            this.updateNodeGlobalMatrices();
+            this.renderRequested = true;
+        }
+
         // update projectionmatrix
         const fieldOfView = 45 * Math.PI / 180;   // in radians
         const aspect = this.gl.canvas.width / this.gl.canvas.height;
         const zNear = 0.1;
-        const zFar = 100.0;
+        const zFar = 1000.0;
         const projectionMatrix = Mat4Math.perspective(fieldOfView, aspect, zNear, zFar);
 
 

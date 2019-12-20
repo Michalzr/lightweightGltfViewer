@@ -18,6 +18,7 @@ export interface LoadedGltf {
     dataViews?: DataView[];
     images?: HTMLImageElement[];
     skins?: Skin[];
+    animations?: Animation[];
 }
 
 export interface Accessor extends GlTf.Accessor {
@@ -26,6 +27,15 @@ export interface Accessor extends GlTf.Accessor {
 
 export interface Skin extends GlTf.Skin {
     inverseBindMatricesData?: Mat4Math.Mat4[];
+}
+
+export interface AnimationSampler extends GlTf.AnimationSampler {
+    inputData?: Float32Array;
+    outputData?: Float32Array;
+}
+
+export interface Animation extends GlTf.Animation {
+    samplers: AnimationSampler[];
 }
 
 export class GltfLoader {
@@ -229,7 +239,8 @@ export class GltfLoader {
             images: images,
             accessors: gltfJson.accessors as Accessor[],
             dataViews: this.createDataViews(gltfJson, buffers),
-            skins: gltfJson.skins
+            skins: gltfJson.skins,
+            animations: gltfJson.animations
         }
     }
 

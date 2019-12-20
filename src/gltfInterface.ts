@@ -137,7 +137,7 @@ interface AnimationChannel {
 /**
  * Combines input and output accessors with an interpolation algorithm to define a keyframe graph (but not its target).
  */
-interface AnimationSampler {
+export interface AnimationSampler {
   /**
    * The index of an accessor containing keyframe input values, e.g., time.
    */
@@ -157,7 +157,7 @@ interface AnimationSampler {
 /**
  * A keyframe animation.
  */
-interface Animation {
+export interface Animation {
   /**
    * An array of channels, each of which targets an animation's sampler at a node's property. Different channels of the same animation can't have equal targets.
    */

@@ -17,6 +17,9 @@ export function fillGltfDefaultValues(loadedGltf: LoadedGltf): void {
 
     // read the bind pose data to a more readable form - array of matrices
     fillBindPoseData(loadedGltf);
+
+    // read the animation data to a more readable form
+    fillAnimationData(loadedGltf);
 }
 
 // resize and move the loaded scene so it fits default orbit controls setup (fit in 1x1x1 box with center in (0,0,0))
@@ -77,9 +80,13 @@ export function fitToView(loadedGltf: LoadedGltf): void {
 
         const fitMatrix = Mat4Math.fromTranslationRotationScale(translate, rotate, scale);
 
-        loadedGltf.rootNodeIds.forEach(nodeId => {
-            loadedGltf.nodes[nodeId].matrix = Mat4Math.multiply(fitMatrix, loadedGltf.nodes[nodeId].matrix as Mat4Math.Mat4);
-        })
+        loadedGltf.nodes.push({
+            name: "fitToViewRoot",
+            children: loadedGltf.rootNodeIds,
+            matrix: fitMatrix
+        });
+
+        loadedGltf.rootNodeIds = [loadedGltf.nodes.length - 1];
     }
 }
 
@@ -340,6 +347,54 @@ function fillBindPoseData(loadedGltf: LoadedGltf): void {
             }
         });
     }
+}
+
+function fillAnimationData(loadedGltf: LoadedGltf): void {
+    if (loadedGltf.animations) {
+        loadedGltf.animations.forEach(animation => {
+            animation.samplers.forEach(animationSampler => {
+                animationSampler.inputData = getTypedArrayForSampler(loadedGltf, animationSampler.input);
+                animationSampler.outputData = getTypedArrayForSampler(loadedGltf, animationSampler.output);
+            });
+        });
+    }
+}
+
+function getTypedArrayForSampler(loadedGltf: LoadedGltf, accessorIdx: number): Float32Array {
+    const dataAccessor = loadedGltf.accessors[accessorIdx];
+    const dataView = loadedGltf.dataViews[dataAccessor.bufferView];
+
+    const componentByteLenght = COMPONENT_BYTESIZE.get(dataAccessor.componentType);
+    const numberOfComponents = NUMBER_OF_COMPONENTS.get(dataAccessor.type);
+    const elementByteStride = dataAccessor.byteStride || componentByteLenght * numberOfComponents;
+    let elementIndex = dataAccessor.byteOffset || 0;
+
+    const result = new Float32Array(dataAccessor.count * numberOfComponents);
+
+    let getNumber: (iIndex: number) => number;
+
+    if (dataAccessor.componentType === 5120) { // byte
+        getNumber = (iIndex: number) => Math.max(dataView.getInt8(iIndex) / 127.0, -1.0);
+    } else if (dataAccessor.componentType === 5121) { // ubyte
+        getNumber = (iIndex: number) => dataView.getUint8(iIndex) / 255;
+    } else if (dataAccessor.componentType === 5122) { // short
+        getNumber = (iIndex: number) => Math.max(dataView.getInt16(iIndex) / 32767.0, -1.0);
+    } else if (dataAccessor.componentType === 5123) { // ushort
+        getNumber = (iIndex: number) => dataView.getUint16(iIndex, true) / 65535.0;
+    }  else if (dataAccessor.componentType === 5125) { // uint
+        getNumber = (iIndex: number) => dataView.getUint32(iIndex, true);
+    } else { // float
+        getNumber = (iIndex: number) => dataView.getFloat32(iIndex, true);
+    }
+
+    for (let i = 0, j = 0; i < result.length; i += numberOfComponents) {
+        for (j = 0; j < numberOfComponents; j++) {
+            result[i + j] = getNumber(elementIndex + j * componentByteLenght);
+        }
+        elementIndex += elementByteStride;
+    }
+
+    return result;
 }
 
 function getTypedArray(loadedGltf: LoadedGltf, accessorIdx: number): Float32Array {
