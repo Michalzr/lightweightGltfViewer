@@ -33,8 +33,14 @@ export function bindResize(canvas: HTMLCanvasElement, cb: () => void): void {
 
 export function bindModelSelect(modelSelect: HTMLSelectElement, cb: (files: NamedBlob[]) => void): void {
     const loadSelectedModel = async () => {
+        const downloadLabel = document.querySelector("#downloadLabel") as HTMLDivElement;
+        downloadLabel.style.visibility = "visible";
+
         const fileResponse = await fetch(modelSelect.value);
         const file = await fileResponse.blob();
+
+        downloadLabel.style.visibility = "hidden";
+
         cb([new NamedBlob(file, modelSelect.value)]);
     }
     modelSelect.addEventListener("change", loadSelectedModel);

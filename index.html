@@ -2,18 +2,21 @@
     <canvas id="glCanvas" width="640" height="480" style="position:absolute; touch-action: none;"></canvas>
     <select id="modelSelect" style="position:absolute; right:0px">
         <option value="assets/BrainStem.glb">Brain stem (3.04MB) (animated)</option>
-        <option value="assets/BusterDrone.glb">Buster drone (39.6MB) (animated)</option>
         <option value="assets/Avocado.glb">Avocado (0.5MB)</option>
         <option value="assets/Duck.glb">Duck (0.1MB)</option>
         <option value="assets/FlightHelmet.glb">Flight helmet (5.6MB)</option>
         <option value="assets/Thumbman.glb">Thumbman (1.54MB)</option>
+        <option value="assets/BusterDrone.glb">Buster drone (39.6MB) (animated)</option>
     </select>
-    <label style="color: white; position: absolute;">
+    <div id="downloadLabel" style="color: white; position: absolute; right:0px; top:20px; visibility: hidden;">
+        Downloading, please wait
+    </div>
+    <div style="color: white; position: absolute;">
         Drag&drop gltf/glb files or use the select <br>
         leftMouseDrag - rotate <br>
         rightMouseDrag - pan <br>
         scroll - zoom <br>
-    </label>
+    </div>
 </body>
 
 
