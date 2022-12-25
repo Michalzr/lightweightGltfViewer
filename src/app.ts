@@ -1,8 +1,8 @@
-import { Renderer } from "./renderer.js"
-import { OrbitControls } from "./orbitControls.js"
-import { bindDragAndDrop, bindResize, bindModelSelect } from "./uiBindings.js"
-import { GltfLoader } from "./gltfLoader.js"
-import { NamedBlob } from "./utils/fileUtils.js";
+import { Renderer } from "./renderer";
+import { OrbitControls } from "./orbitControls";
+import { bindDragAndDrop, bindResize, bindModelSelect } from "./uiBindings";
+import { GltfLoader } from "./gltfLoader";
+import { NamedBlob } from "./utils/fileUtils";
 
 // TODO:
 // - Textures
@@ -20,30 +20,30 @@ import { NamedBlob } from "./utils/fileUtils.js";
 // 8, 5, 4, 2
 
 function run() {
-    const canvas = document.querySelector("#glCanvas") as HTMLCanvasElement;
-    const modelSelect = document.querySelector("#modelSelect") as HTMLSelectElement;
+  const canvas = document.querySelector("#glCanvas") as HTMLCanvasElement;
+  const modelSelect = document.querySelector("#modelSelect") as HTMLSelectElement;
 
-    const renderer = new Renderer(canvas);
-    const orbitControls = new OrbitControls(canvas);
+  const renderer = new Renderer(canvas);
+  const orbitControls = new OrbitControls(canvas);
 
-    function requestRender() {
-        renderer.requestRender(orbitControls.getViewMatrix());
-    }
+  function requestRender() {
+    renderer.requestRender(orbitControls.getViewMatrix());
+  }
 
-    async function loadFiles(files: NamedBlob[]) {
-        const loadedGltf = await new GltfLoader().load(files);
-        orbitControls.resetCamera();
-        renderer.setGltf(loadedGltf);
-        requestRender();
-    }
+  async function loadFiles(files: NamedBlob[]) {
+    const loadedGltf = await new GltfLoader().load(files);
+    orbitControls.resetCamera();
+    renderer.setGltf(loadedGltf);
+    requestRender();
+  }
 
-    // bind the UI
-    bindResize(canvas, requestRender);
-    bindDragAndDrop(canvas, loadFiles);
-    bindModelSelect(modelSelect, loadFiles);
+  // bind the UI
+  bindResize(canvas, requestRender);
+  bindDragAndDrop(canvas, loadFiles);
+  bindModelSelect(modelSelect, loadFiles);
 
-    // instead of having render loop, we only render when moving camera
-    orbitControls.sigChange.connect(requestRender);
+  // instead of having render loop, we only render when moving camera
+  orbitControls.sigChange.connect(requestRender);
 }
 
 run();

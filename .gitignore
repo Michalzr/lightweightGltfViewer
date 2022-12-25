@@ -1,3 +1,4 @@
-build/
+build.js
 node_modules/
+testAssets/
 package-lock.json
