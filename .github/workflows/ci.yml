@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.13.x
+          cache: npm
+
+      - name: install dependencies
+        run: npm i
+
+      - name: build
+        run: npm run build
+
+      - name: deploy
+        uses: SamKirkland/FTP-Deploy-Action@4.3.3
+        with:
+          server: michalzrubec.sk
+          username: michalzr.michalzrubec.sk
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: web/lightweightGltfLoader/
+          exclude: |
+            assets/**
+            .git*
+            .git*/**
+            node_modules/**
+            src/**
+            package-lock.json
+            package.json
+            README.md
+            tsconfig.json
+
+concurrency:
+  group: ${{ github.ref_name }}
+  cancel-in-progress: true

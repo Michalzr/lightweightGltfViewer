@@ -1,19 +1,14 @@
 {
   "name": "lightweightgltfviewer",
   "version": "1.0.0",
+  "private": true,
   "description": "This project is an exercise. It is not intended to be used commercially.  \r Implementing gltf viewer from scratch. No libraries.\r To build you only need to compile the typscript files https://www.typescriptlang.org/docs/handbook/typescript-in-5-minutes.html",
   "main": "index.js",
   "scripts": {
     "start": "esbuild src/app.ts --servedir=. --outfile=build.js --sourcemap --bundle",
     "build": "esbuild src/app.ts --outfile=build.js --bundle --minify"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Michalzr/lightweightGltfViewer.git"
-  },
-  "author": "Michal Zrubec",
   "license": "ISC",
-  "homepage": "https://github.com/Michalzr/lightweightGltfViewer#readme",
   "dependencies": {
     "esbuild": "0.16.10",
     "typescript": "^4.9.4"
