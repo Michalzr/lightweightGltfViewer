@@ -9,7 +9,7 @@
     "build": "esbuild src/app.ts --outfile=build.js --bundle --minify"
   },
   "license": "ISC",
-  "dependencies": {
+  "devDependencies": {
     "esbuild": "0.16.10",
     "typescript": "^4.9.4"
   }
