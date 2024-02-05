@@ -1,4 +1,4 @@
-name: CI
+name: Deploy
 
 on:
   push:
@@ -6,43 +6,30 @@ on:
       - master
 
 jobs:
-  pipeline:
+  deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+      - run: npm i
+      - run: npm run build
 
-      - name: setup node
-        uses: actions/setup-node@v3
+      - name: Set AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          node-version: 16.13.x
-          cache: npm
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
+          aws-region: eu-central-1
 
-      - name: install dependencies
-        run: npm i
-
-      - name: build
-        run: npm run build
-
-      - name: deploy
-        uses: SamKirkland/FTP-Deploy-Action@4.3.3
-        with:
-          server: michalzrubec.sk
-          username: michalzr.michalzrubec.sk
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: web/lightweightGltfLoader/
-          exclude: |
-            assets/**
-            .git*
-            .git*/**
-            node_modules/**
-            src/**
-            package-lock.json
-            package.json
-            README.md
-            tsconfig.json
-
-concurrency:
-  group: ${{ github.ref_name }}
-  cancel-in-progress: true
+      - name: Copy to S3
+        run: |
+          aws s3 sync . s3://lightweightgltfloader \
+            --exclude ".git*" \
+            --exclude ".git*/**" \
+            --exclude "node_modules/**" \
+            --exclude "src/**" \
+            --exclude "package-lock.json" \
+            --exclude "package.json" \
+            --exclude "README.md" \
+            --exclude "tsconfig.json"
