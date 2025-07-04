@@ -118,17 +118,12 @@ export class Renderer {
   private renderNode(nodeIdx: number, viewMatrix: Mat4Math.Mat4, projectionMatrix: Mat4Math.Mat4): void {
     const node = this.gltf.nodes[nodeIdx];
 
-    if (this.nodeGlobalMatrices[nodeIdx]) {
-      // node is referred to from the scene
-      if (node.hasOwnProperty("mesh") && this.nodeGlobalMatrices[nodeIdx]) {
-        const bones = node.hasOwnProperty("skin") ? this.getBones(nodeIdx) : null;
-
-        // node has a mesh, and it is referenced from the scene
-        const meshPrimitives = this.gltf.meshes[node.mesh].primitives;
-        meshPrimitives.forEach((meshPrimitive) => {
-          this.renderMeshPrimitive(meshPrimitive, this.nodeGlobalMatrices[nodeIdx], viewMatrix, projectionMatrix, bones);
-        });
-      }
+    if (this.nodeGlobalMatrices[nodeIdx] && node.hasOwnProperty("mesh")) {
+      const bones = node.hasOwnProperty("skin") ? this.getBones(nodeIdx) : null;
+      const meshPrimitives = this.gltf.meshes[node.mesh].primitives;
+      meshPrimitives.forEach((meshPrimitive) => {
+        this.renderMeshPrimitive(meshPrimitive, this.nodeGlobalMatrices[nodeIdx], viewMatrix, projectionMatrix, bones);
+      });
     }
   }
 
